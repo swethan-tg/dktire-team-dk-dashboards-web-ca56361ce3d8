@@ -1,10 +1,12 @@
-FROM node:22-bookworm-slim AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-RUN npm ci
+RUN npm ci && \
+    ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") && \
+    npm install --no-save "@rollup/rollup-linux-x64-musl@${ROLLUP_VERSION}"
 
 COPY . .
 
