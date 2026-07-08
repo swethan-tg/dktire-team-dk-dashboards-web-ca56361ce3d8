@@ -82,7 +82,7 @@ pipelines:
           script:
             - export AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID_DEV}"
             - export ECS_CLUSTER_NAME="${ECS_CLUSTER_NAME_STAGE}"
-            - export ECS_SERVICE_NAME="arn:aws:ecs:us-east-2:${AWS_ACCOUNT_ID_DEV}:service/dk-b2b-api-stage-cluster/b2b_admin_api_stage"
+            - export ECS_SERVICE_NAME="arn:aws:ecs:us-east-2:${AWS_ACCOUNT_ID_DEV}:service/dk-dashboards/dk-dashboards-web"
             - export TASK_DEFINITION_FILE="deploy/aws/stage/task_definition.json"
             - *deploy_script
 
@@ -96,6 +96,6 @@ pipelines:
           script:
             - export AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID_PROD}"
             - export ECS_CLUSTER_NAME="${ECS_CLUSTER_NAME_PROD}"
-            - export ECS_SERVICE_NAME="arn:aws:ecs:us-east-2:${AWS_ACCOUNT_ID_PROD}:service/B2B-Api-Cluster/dk-web-admin-api-service"
+            - export ECS_SERVICE_NAME="arn:aws:ecs:us-east-2:${AWS_ACCOUNT_ID_PROD}:service/dk-dashboards/dk-dashboards-web"
             - export TASK_DEFINITION_FILE="deploy/aws/prod/task_definition.json"
             - *deploy_script
