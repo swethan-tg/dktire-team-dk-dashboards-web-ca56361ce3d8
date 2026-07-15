@@ -126,10 +126,10 @@ export default function SalesPerformanceDashboard() {
   const salesCenterShift = barSize / 2 + 2;
 
   return (
-    <div className="h-screen overflow-hidden bg-white px-3 py-1 text-[--sales-text] sm:px-4 lg:px-5">
-      <div className="mx-auto flex h-full w-full max-w-[1520px] flex-col gap-1.5">
-        <header className="grid grid-cols-[1fr_auto_1fr] items-center px-1 py-1">
-          <p className="text-base font-black tracking-tight text-[#0f1f54] sm:text-lg md:text-xl xl:text-2xl 2xl:text-3xl">DK TIRE</p>
+    <div className="h-screen overflow-hidden bg-white text-[--sales-text]">
+      <div className="flex h-full w-full flex-col gap-1.5">
+        <header className="grid grid-cols-[1fr_auto_1fr] items-center px-0 py-1">
+          <div />
           <h1 className="text-center text-sm font-extrabold uppercase tracking-[0.05em] text-[#122263] sm:text-base md:text-lg xl:text-xl 2xl:text-2xl">
             Sales Performance Dashboard
           </h1>
@@ -145,7 +145,7 @@ export default function SalesPerformanceDashboard() {
           </div>
         ) : null}
 
-        <div className="grid gap-2 xl:grid-cols-2 -mx-3 sm:-mx-4 lg:-mx-5">
+        <div className="grid gap-2 xl:grid-cols-2">
           <SummaryPanel
             title="Sales Performance"
             accent="blue"
@@ -160,7 +160,7 @@ export default function SalesPerformanceDashboard() {
           />
         </div>
 
-        <section className="min-h-0 flex flex-1 flex-col rounded-xl border border-[#e7edf7] bg-white p-3 shadow-[0_14px_40px_rgba(15,23,42,0.05)] sm:p-4 lg:p-5 -mx-3 sm:-mx-4 lg:-mx-5">
+        <section className="min-h-0 flex flex-1 flex-col rounded-xl border border-[#e7edf7] bg-white p-3 shadow-[0_14px_40px_rgba(15,23,42,0.05)] sm:p-4 lg:p-5">
           <div>
             <h2 className="text-lg font-extrabold tracking-tight text-[#122263] sm:text-xl md:text-2xl xl:text-3xl">
               {currentPeriodLabel} Sales by Site{' '}
