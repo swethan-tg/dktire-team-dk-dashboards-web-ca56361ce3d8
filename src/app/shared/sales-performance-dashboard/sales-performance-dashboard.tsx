@@ -102,7 +102,11 @@ export default function SalesPerformanceDashboard() {
 
   const chartRows = useMemo(() => {
     const rows = dashboard?.chartRows ?? [];
-    return [...rows].sort((a, b) => (b.salesAmt ?? 0) - (a.salesAmt ?? 0));
+    return [...rows].sort((a, b) => {
+      const siteIdA = parseInt(a.siteId ?? '0', 10);
+      const siteIdB = parseInt(b.siteId ?? '0', 10);
+      return siteIdA - siteIdB;
+    });
   }, [dashboard]);
   const salesDomain = useMemo<[number, number]>(() => {
     const values = chartRows.flatMap((row) => [row.salesAmt ?? 0, row.lastYearSalesAmt ?? 0]);
@@ -141,7 +145,7 @@ export default function SalesPerformanceDashboard() {
           </div>
         ) : null}
 
-        <div className="grid gap-2 xl:grid-cols-2">
+        <div className="grid gap-2 xl:grid-cols-2 -mx-3 sm:-mx-4 lg:-mx-5">
           <SummaryPanel
             title="Sales Performance"
             accent="blue"
@@ -156,7 +160,7 @@ export default function SalesPerformanceDashboard() {
           />
         </div>
 
-        <section className="min-h-0 flex flex-1 flex-col rounded-xl border border-[#e7edf7] bg-white p-3 shadow-[0_14px_40px_rgba(15,23,42,0.05)] sm:p-4 lg:p-5">
+        <section className="min-h-0 flex flex-1 flex-col rounded-xl border border-[#e7edf7] bg-white p-3 shadow-[0_14px_40px_rgba(15,23,42,0.05)] sm:p-4 lg:p-5 -mx-3 sm:-mx-4 lg:-mx-5">
           <div>
             <h2 className="text-lg font-extrabold tracking-tight text-[#122263] sm:text-xl md:text-2xl xl:text-3xl">
               {currentPeriodLabel} Sales by Site{' '}
@@ -501,7 +505,7 @@ function SalesFlatRowLabel({
 }: {
   x?: number | string;
   y?: number | string;
-  value?: number;
+  value?: number | string;
   payload?: any;
   mode: 'current' | 'lastYear';
   centerShift?: number;
@@ -514,7 +518,8 @@ function SalesFlatRowLabel({
   }
 
   // Get sales amount from value (dataKey) or payload
-  const salesAmt = value ?? payload?.salesAmt ?? 0;
+  const numValue = typeof value === 'string' ? Number(value) : value;
+  const salesAmt = numValue ?? payload?.salesAmt ?? 0;
   if (!salesAmt || salesAmt === 0) {
     return null;
   }
