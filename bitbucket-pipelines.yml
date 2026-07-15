@@ -82,7 +82,7 @@ pipelines:
           script:
             - export AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID_DEV}"
             - export ECS_CLUSTER_NAME="${ECS_CLUSTER_NAME_STAGE}"
-            - export ECS_SERVICE_NAME="arn:aws:ecs:us-east-2:${AWS_ACCOUNT_ID_DEV}:service/dk-dashboards/dk-dashboards-web"
+            - export ECS_SERVICE_NAME="arn:aws:ecs:us-east-2:110377003250:service/dk-dashboards/dk-dashboards-api-service"
             - export TASK_DEFINITION_FILE="deploy/aws/stage/task_definition.json"
             - *deploy_script
 
