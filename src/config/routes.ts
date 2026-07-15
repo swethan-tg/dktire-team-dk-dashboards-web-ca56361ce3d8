@@ -53,6 +53,9 @@ export const routes = {
   crm: {
     dashboard: '/crm',
   },
+  salesPerformance: {
+    dashboard: '/sales-performance',
+  },
   affiliate: {
     dashboard: 'https://isomorphic-dnd.vercel.app',
   },

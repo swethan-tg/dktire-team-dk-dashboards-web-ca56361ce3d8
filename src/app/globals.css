@@ -6,6 +6,10 @@
 @tailwind utilities;
 
 @layer base {
+  html, body, * {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Plus Jakarta Sans', 'Helvetica Neue', Arial, sans-serif;
+  }
+
   /* default theme */
   :root {
     /*
