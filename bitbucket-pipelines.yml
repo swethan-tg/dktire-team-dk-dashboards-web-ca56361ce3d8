@@ -35,22 +35,22 @@ definitions:
               echo "Pushing Docker image"
               docker push "${ECR_URI}:${IMAGE_TAG}"
 
-              # echo "Updating task definition: ${TASK_DEFINITION_FILE}"
-              # sed -i "s/#{buildId}#/${IMAGE_TAG}/g" "${TASK_DEFINITION_FILE}"
+              echo "Updating task definition: ${TASK_DEFINITION_FILE}"
+              sed -i "s/#{buildId}#/${IMAGE_TAG}/g" "${TASK_DEFINITION_FILE}"
 
-              # echo "Registering ECS task definition"
-              # TASK_ARN=$(aws ecs register-task-definition \
-              #   --cli-input-json "file://${TASK_DEFINITION_FILE}" \
-              #   --query 'taskDefinition.taskDefinitionArn' \
-              #   --output text)
+              echo "Registering ECS task definition"
+              TASK_ARN=$(aws ecs register-task-definition \
+                --cli-input-json "file://${TASK_DEFINITION_FILE}" \
+                --query 'taskDefinition.taskDefinitionArn' \
+                --output text)
 
-              # echo "Registered task definition: ${TASK_ARN}"
+              echo "Registered task definition: ${TASK_ARN}"
 
-              # echo "Updating ECS service: ${ECS_SERVICE_NAME}"
-              # aws ecs update-service \
-              #   --cluster "${ECS_CLUSTER_NAME}" \
-              #   --service "${ECS_SERVICE_NAME}" \
-              #   --task-definition "${TASK_ARN}"
+              echo "Updating ECS service: ${ECS_SERVICE_NAME}"
+              aws ecs update-service \
+                --cluster "${ECS_CLUSTER_NAME}" \
+                --service "${ECS_SERVICE_NAME}" \
+                --task-definition "${TASK_ARN}"
         after-script:
           - |
               unset DOCKER_HOST
@@ -76,13 +76,13 @@ definitions:
 
 pipelines:
   branches:
-    staging:
+    main:
       - step:
           <<: *deploy_step
           script:
             - export AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID_DEV}"
             - export ECS_CLUSTER_NAME="${ECS_CLUSTER_NAME_STAGE}"
-            - export ECS_SERVICE_NAME="arn:aws:ecs:us-east-2:110377003250:service/dk-dashboards/dk-dashboards-api-service"
+            - export ECS_SERVICE_NAME="arn:aws:ecs:us-east-2:110377003250:service/dk-dashboards/dk-dashboards-web-service"
             - export TASK_DEFINITION_FILE="deploy/aws/stage/task_definition.json"
             - *deploy_script
 
