@@ -10,7 +10,10 @@ export type SalesPerformanceMetric = {
 };
 
 export type SalesPerformanceSiteMetric = {
-  sales_amt: number;
+  current_sales_amt: number;
+  prev_sales_amt: number;
+  gross_profit: number;
+  prev_gross_profit: number;
   profit_pct: number;
   sales_pct: number;
   last_yr_sales_pct: number;
@@ -34,6 +37,8 @@ export type SalesPerformanceResponse = {
 
 export type SalesPerformanceChartRow = {
   siteId: string;
+  salesAmt: number;
+  lastYearSalesAmt?: number;
   salesPct: number;
   lastYearSalesPct: number;
   profitPct: number;

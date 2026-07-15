@@ -76,6 +76,8 @@ export function mapSalesPerformanceSiteItem(
 
   return {
     siteId: item.site_id,
+    salesAmt: value.current_sales_amt,
+    lastYearSalesAmt: value.prev_sales_amt,
     salesPct: value.sales_pct,
     lastYearSalesPct: value.last_yr_sales_pct,
     profitPct: value.profit_pct,

@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useWindowSize } from '@/hooks/use-window-size';
 import { Bar, CartesianGrid, ComposedChart, LabelList, Line, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { PiInfo, PiArrowUpRight, PiArrowDownRight } from 'react-icons/pi';
 import cn from '@core/utils/class-names';
+import { formatNumber } from '@/utils/format-number';
 import { fetchSalesPerformance } from '@/services/sales-performance/sales-performance.service';
 import type { SalesPerformanceDashboard as SalesPerformanceDashboardType } from '@/services/sales-performance/sales-performance.model';
 import { buildSalesPerformanceDashboard } from '@/services/sales-performance/sales-performance.model';
@@ -16,7 +16,7 @@ const periodLabels: Record<SalesPerformancePeriod, string> = {
   ytd: 'YTD',
 };
 
-const periodCarousel: SalesPerformancePeriod[] = ['qtd', 'ytd', 'mtd'];
+const periodCarousel: SalesPerformancePeriod[] = ['mtd', 'qtd', 'ytd'];
 
 const colors = {
   sales: '#1d63f2',
@@ -44,9 +44,21 @@ function buildPercentDomain(values: number[], fallbackMax: number): [number, num
   return [domainMin, domainMax];
 }
 
+function buildSalesDomain(values: number[]): [number, number] {
+  const finiteValues = values.filter((value) => Number.isFinite(value) && value > 0);
+
+  if (!finiteValues.length) {
+    return [0, 100000000];
+  }
+
+  const max = Math.max(...finiteValues);
+  const domainMax = Math.ceil((max / 1000000) * 1.1) * 1000000; // Add 10% padding
+
+  return [0, domainMax];
+}
+
 export default function SalesPerformanceDashboard() {
-  const { width: screenWidth } = useWindowSize();
-  const [period, setPeriod] = useState<SalesPerformancePeriod>('qtd');
+  const [period, setPeriod] = useState<SalesPerformancePeriod>('mtd');
   const [source, setSource] = useState<SalesPerformanceDashboardType['source'] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,11 +102,11 @@ export default function SalesPerformanceDashboard() {
 
   const chartRows = useMemo(() => {
     const rows = dashboard?.chartRows ?? [];
-    return [...rows].sort((a, b) => b.salesPct - a.salesPct);
+    return [...rows].sort((a, b) => (b.salesAmt ?? 0) - (a.salesAmt ?? 0));
   }, [dashboard]);
   const salesDomain = useMemo<[number, number]>(() => {
-    const values = chartRows.flatMap((row) => [row.salesPct, row.lastYearSalesPct]);
-    return buildPercentDomain(values, 20);
+    const values = chartRows.flatMap((row) => [row.salesAmt ?? 0, row.lastYearSalesAmt ?? 0]);
+    return buildSalesDomain(values);
   }, [chartRows]);
 
   const profitDomain: [number, number] = [0, 50];
@@ -104,16 +116,14 @@ export default function SalesPerformanceDashboard() {
   const xTickAngle = chartRows.length > 12 ? -45 : 0;
   const xTickHeight = chartRows.length > 16 ? 64 : 42;
   const barSize = useMemo(() => {
-    // Scale multiplier based on screen width
-    const scale = screenWidth >= 2560 ? 2.2 : screenWidth >= 1920 ? 1.7 : screenWidth >= 1440 ? 1.3 : screenWidth >= 1280 ? 1.1 : 1;
-    const base = chartRows.length > 24 ? 12 : chartRows.length > 16 ? 14 : 18;
-    return Math.round(base * scale);
-  }, [screenWidth, chartRows.length]);
+    // Fixed base size without screen scaling
+    return chartRows.length > 24 ? 12 : chartRows.length > 16 ? 14 : 18;
+  }, [chartRows.length]);
   const salesCenterShift = barSize / 2 + 2;
 
   return (
-    <div className="h-screen overflow-hidden bg-white px-4 py-2 text-[--sales-text] sm:px-5 lg:px-6">
-      <div className="mx-auto flex h-full w-full max-w-[1520px] flex-col gap-2">
+    <div className="h-screen overflow-hidden bg-white px-3 py-1 text-[--sales-text] sm:px-4 lg:px-5">
+      <div className="mx-auto flex h-full w-full max-w-[1520px] flex-col gap-1.5">
         <header className="grid grid-cols-[1fr_auto_1fr] items-center px-1 py-1">
           <p className="text-base font-black tracking-tight text-[#0f1f54] sm:text-lg md:text-xl xl:text-2xl 2xl:text-3xl">DK TIRE</p>
           <h1 className="text-center text-sm font-extrabold uppercase tracking-[0.05em] text-[#122263] sm:text-base md:text-lg xl:text-xl 2xl:text-2xl">
@@ -153,8 +163,8 @@ export default function SalesPerformanceDashboard() {
               <span className="text-sm font-semibold text-[#41507a] sm:text-base md:text-lg xl:text-xl">(vs Last Year {currentPeriodLabel})</span>
             </h2>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-[#29407c] sm:text-sm md:text-base">
-              <LegendDot color={colors.sales} label={`${currentPeriodLabel} Sales % (Current)`} solid />
-              <LegendDot color={colors.salesLight} label={`${currentPeriodLabel} Sales % (Last Year)`} dashed />
+              <LegendDot color={colors.sales} label={`${currentPeriodLabel} Sales (Current)`} solid />
+              <LegendDot color={colors.salesLight} label={`${currentPeriodLabel} Sales (Last Year)`} dashed />
               <LegendDot color={colors.profit} label={`Profit % (${currentPeriodLabel}) (Current)`} solid line />
               <LegendDot color={colors.profitLight} label={`Profit % (${currentPeriodLabel}) (Last Year)`} dashed line />
             </div>
@@ -198,7 +208,7 @@ export default function SalesPerformanceDashboard() {
                     tickMargin={14}
                     width={52}
                     domain={salesDomain}
-                    tickFormatter={(value) => `${value}%`}
+                    tickFormatter={(value) => formatNumber(value)}
                   />
                   <YAxis
                     yAxisId="right"
@@ -230,9 +240,9 @@ export default function SalesPerformanceDashboard() {
                     connectNulls
                     opacity={0.9}
                   />
-                  <Bar yAxisId="left" dataKey="salesPct" name={`${currentPeriodLabel} Sales % (Current)`} fill="url(#salesFill)" barSize={barSize} radius={[8, 8, 0, 0]}>
+                  <Bar yAxisId="left" dataKey="salesAmt" name={`${currentPeriodLabel} Sales (Current)`} fill="url(#salesFill)" barSize={barSize} radius={[8, 8, 0, 0]}>
                     <LabelList
-                      dataKey="salesPct"
+                      dataKey="salesAmt"
                       content={(props) => (
                         <SalesFlatRowLabel
                           {...props}
@@ -242,9 +252,9 @@ export default function SalesPerformanceDashboard() {
                       )}
                     />
                   </Bar>
-                  <Bar yAxisId="left" dataKey="lastYearSalesPct" name={`${currentPeriodLabel} Sales % (Last Year)`} fill="url(#salesOutline)" barSize={barSize} radius={[8, 8, 0, 0]}>
+                  <Bar yAxisId="left" dataKey="lastYearSalesAmt" name={`${currentPeriodLabel} Sales (Last Year)`} fill="url(#salesOutline)" barSize={barSize} radius={[8, 8, 0, 0]}>
                     <LabelList
-                      dataKey="lastYearSalesPct"
+                      dataKey="lastYearSalesAmt"
                       content={(props) => (
                         <SalesFlatRowLabel
                           {...props}
@@ -363,12 +373,12 @@ function SummaryPanel({
           const isPositive = item ? item.trend === 'UP' : false;
           const primaryValue = item
             ? isSalesMetric
-              ? formatShortNumber(item.current)
+              ? `$${formatShortNumber(item.current)}`
               : `${item.currentPercent > 0 ? '+' : ''}${item.currentPercent.toFixed(1)}%`
             : '--';
           const previousValue = item
             ? isSalesMetric
-              ? `Prev: ${formatShortNumber(item.previous)}`
+              ? `Prev: $${formatShortNumber(item.previous)}`
               : `Prev: ${item.previousPercent > 0 ? '+' : ''}${item.previousPercent.toFixed(1)}%`
             : 'Prev: --';
 
@@ -483,39 +493,47 @@ function LineValueLabel({
 
 function SalesFlatRowLabel({
   x,
+  y,
   value,
+  payload,
   mode,
   centerShift,
 }: {
   x?: number | string;
-  value?: number | string;
+  y?: number | string;
+  value?: number;
+  payload?: any;
   mode: 'current' | 'lastYear';
   centerShift?: number;
 }) {
-  const px = typeof x === 'string' ? Number(x) : x;
-  const pvalue = typeof value === 'string' ? Number(value) : value;
-
-  if (
-    typeof px !== 'number' ||
-    typeof pvalue !== 'number' ||
-    Number.isNaN(px) ||
-    Number.isNaN(pvalue)
-  ) {
+  const px = typeof x === 'string' ? Number(x) : (x ?? 0);
+  const py = typeof y === 'string' ? Number(y) : (y ?? 0);
+  
+  if (typeof px !== 'number' || Number.isNaN(px)) {
     return null;
   }
 
-  const text = `${pvalue.toFixed(2)}%`;
-  const width = text.length * 7 + 10;
-  const labelY = mode === 'current' ? 8 : 26;
-  const xAligned = mode === 'current' ? px + (centerShift ?? 0) : px - (centerShift ?? 0);
-  const textColor = mode === 'current' ? '#0f46c8' : '#5f7194';
-  const strokeColor = mode === 'current' ? '#cfe0ff' : '#d7e0ef';
-  const fillColor = mode === 'current' ? '#f7faff' : '#fbfcff';
+  // Get sales amount from value (dataKey) or payload
+  const salesAmt = value ?? payload?.salesAmt ?? 0;
+  if (!salesAmt || salesAmt === 0) {
+    return null;
+  }
+
+  const text = formatShortNumber(salesAmt);
+  const textWidth = Math.max(text.length * 6 + 8, 40);
+  const isCurrent = mode === 'current';
+  const yPosition = isCurrent ? 8 : 26; // Fixed Y position at top of chart for ALL sites
+  const xAligned = isCurrent 
+    ? px + (centerShift ?? 0)    // Current bar shifts right to center
+    : px - (centerShift ?? 0);   // Previous bar shifts left to center
+  const textColor = isCurrent ? '#0f46c8' : '#5f7194';
+  const strokeColor = isCurrent ? '#cfe0ff' : '#d7e0ef';
+  const fillColor = isCurrent ? '#f7faff' : '#fbfcff';
 
   return (
-    <g transform={`translate(${xAligned - width / 2},${labelY})`}>
-      <rect width={width} height={16} rx={5} fill={fillColor} fillOpacity={1} stroke={strokeColor} />
-      <text x={width / 2} y={12} textAnchor="middle" fontSize="10" fontWeight="700" fill={textColor}>
+    <g transform={`translate(${xAligned - textWidth / 2},${yPosition})`}>
+      <rect width={textWidth} height={16} rx={5} fill={fillColor} fillOpacity={1} stroke={strokeColor} />
+      <text x={textWidth / 2} y={12} textAnchor="middle" fontSize="10" fontWeight="700" fill={textColor}>
         {text}
       </text>
     </g>
