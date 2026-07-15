@@ -1,0 +1,56 @@
+{
+    "family": "dk-dashboards-web",
+    "containerDefinitions": [
+        {
+            "name": "dk-dashboards-web",
+            "image": "110377003250.dkr.ecr.us-east-2.amazonaws.com/dk-dashboards-web:#{buildId}#",
+            "cpu": 0,
+            "portMappings": [
+                {
+                    "containerPort": 7070,
+                    "hostPort": 7070,
+                    "protocol": "tcp",
+                    "name": "dk-dashboards-web-port",
+                    "appProtocol": "http"
+                }
+            ],
+            "essential": true,
+            "environment": [],
+            "environmentFiles": [
+                {
+                    "value": "arn:aws:s3:::dk.epod-dev/env/stage/.env",
+                    "type": "s3"
+                }
+            ],
+            "mountPoints": [],
+            "volumesFrom": [],
+            "ulimits": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/dk-dashboards-web",
+                    "awslogs-create-group": "true",
+                    "awslogs-region": "us-east-2",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            },
+            "systemControls": []
+        }
+    ],
+    "taskRoleArn": "arn:aws:iam::110377003250:role/ecsTaskExecutionRole",
+    "executionRoleArn": "arn:aws:iam::110377003250:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
+    "volumes": [],
+    "placementConstraints": [],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "1024",
+    "memory": "3072",
+    "runtimePlatform": {
+        "cpuArchitecture": "X86_64",
+        "operatingSystemFamily": "LINUX"
+    },
+    "enableFaultInjection": false
+}
