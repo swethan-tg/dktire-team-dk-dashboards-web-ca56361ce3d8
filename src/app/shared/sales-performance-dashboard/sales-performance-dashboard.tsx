@@ -78,7 +78,7 @@ export default function SalesPerformanceDashboard() {
         const nextIndex = (currentIndex + 1) % periodCarousel.length;
         return periodCarousel[nextIndex];
       });
-    }, 10000);
+    }, 30000);
 
     return () => window.clearInterval(timer);
   }, []);
