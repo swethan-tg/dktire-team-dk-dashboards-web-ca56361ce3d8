@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useWindowSize } from '@/hooks/use-window-size';
 import { Bar, CartesianGrid, ComposedChart, LabelList, Line, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { PiInfo, PiArrowUpRight, PiArrowDownRight } from 'react-icons/pi';
 import cn from '@core/utils/class-names';
@@ -44,6 +45,7 @@ function buildPercentDomain(values: number[], fallbackMax: number): [number, num
 }
 
 export default function SalesPerformanceDashboard() {
+  const { width: screenWidth } = useWindowSize();
   const [period, setPeriod] = useState<SalesPerformancePeriod>('qtd');
   const [source, setSource] = useState<SalesPerformanceDashboardType['source'] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -101,18 +103,23 @@ export default function SalesPerformanceDashboard() {
   const xTickInterval = 0;
   const xTickAngle = chartRows.length > 12 ? -45 : 0;
   const xTickHeight = chartRows.length > 16 ? 64 : 42;
-  const barSize = chartRows.length > 24 ? 12 : chartRows.length > 16 ? 14 : 18;
+  const barSize = useMemo(() => {
+    // Scale multiplier based on screen width
+    const scale = screenWidth >= 2560 ? 2.2 : screenWidth >= 1920 ? 1.7 : screenWidth >= 1440 ? 1.3 : screenWidth >= 1280 ? 1.1 : 1;
+    const base = chartRows.length > 24 ? 12 : chartRows.length > 16 ? 14 : 18;
+    return Math.round(base * scale);
+  }, [screenWidth, chartRows.length]);
   const salesCenterShift = barSize / 2 + 2;
 
   return (
     <div className="h-screen overflow-hidden bg-white px-4 py-2 text-[--sales-text] sm:px-5 lg:px-6">
       <div className="mx-auto flex h-full w-full max-w-[1520px] flex-col gap-2">
         <header className="grid grid-cols-[1fr_auto_1fr] items-center px-1 py-1">
-          <p className="text-lg font-black tracking-tight text-[#0f1f54] lg:text-xl">DK TIRE</p>
-          <h1 className="text-center text-base font-extrabold uppercase tracking-[0.05em] text-[#122263] lg:text-xl">
+          <p className="text-base font-black tracking-tight text-[#0f1f54] sm:text-lg md:text-xl xl:text-2xl 2xl:text-3xl">DK TIRE</p>
+          <h1 className="text-center text-sm font-extrabold uppercase tracking-[0.05em] text-[#122263] sm:text-base md:text-lg xl:text-xl 2xl:text-2xl">
             Sales Performance Dashboard
           </h1>
-          <p className="justify-self-end inline-flex items-center gap-1.5 text-xs font-semibold text-[#1c2f69] lg:text-sm">
+          <p className="justify-self-end inline-flex items-center gap-1.5 text-xs font-semibold text-[#1c2f69] md:text-sm xl:text-base">
             <PiInfo className="size-4 text-[#1d63f2]" />
             <span>The dashboard data is as of till yesterday</span>
           </p>
@@ -139,13 +146,13 @@ export default function SalesPerformanceDashboard() {
           />
         </div>
 
-        <section className="min-h-0 flex flex-1 flex-col rounded-[28px] border border-[#e7edf7] bg-white p-3 shadow-[0_14px_40px_rgba(15,23,42,0.05)] sm:p-4 lg:p-5">
+        <section className="min-h-0 flex flex-1 flex-col rounded-xl border border-[#e7edf7] bg-white p-3 shadow-[0_14px_40px_rgba(15,23,42,0.05)] sm:p-4 lg:p-5">
           <div>
-            <h2 className="text-xl font-extrabold tracking-tight text-[#122263] lg:text-2xl">
+            <h2 className="text-lg font-extrabold tracking-tight text-[#122263] sm:text-xl md:text-2xl xl:text-3xl">
               {currentPeriodLabel} Sales by Site{' '}
-              <span className="text-base font-semibold text-[#41507a] lg:text-lg">(vs Last Year {currentPeriodLabel})</span>
+              <span className="text-sm font-semibold text-[#41507a] sm:text-base md:text-lg xl:text-xl">(vs Last Year {currentPeriodLabel})</span>
             </h2>
-            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-[#29407c]">
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-[#29407c] sm:text-sm md:text-base">
               <LegendDot color={colors.sales} label={`${currentPeriodLabel} Sales % (Current)`} solid />
               <LegendDot color={colors.salesLight} label={`${currentPeriodLabel} Sales % (Last Year)`} dashed />
               <LegendDot color={colors.profit} label={`Profit % (${currentPeriodLabel}) (Current)`} solid line />
@@ -153,7 +160,7 @@ export default function SalesPerformanceDashboard() {
             </div>
           </div>
 
-          <div className="mt-3 min-h-0 flex-1 rounded-[24px] bg-white pb-1">
+          <div className="mt-3 min-h-0 flex-1 rounded-lg bg-white pb-1">
             <div className="h-full w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
@@ -182,7 +189,7 @@ export default function SalesPerformanceDashboard() {
                     textAnchor={xTickAngle !== 0 ? 'end' : 'middle'}
                     height={xTickHeight}
                     interval={xTickInterval}
-                    tick={{ fontSize: 10 }}
+                    tick={{ fontSize: 13, fontWeight: 700, fill: '#122263' }}
                   />
                   <YAxis
                     yAxisId="left"
@@ -345,8 +352,8 @@ function SummaryPanel({
   const periods = ['mtd', 'qtd', 'ytd'] as const;
 
   return (
-    <section className="overflow-hidden rounded-[28px] border border-[#e7edf7] bg-white shadow-[0_14px_40px_rgba(15,23,42,0.05)]">
-      <div className={cn('px-6 py-1.5 text-center text-sm font-extrabold uppercase tracking-wide text-white lg:text-base', toneBackgroundClass)}>
+    <section className="overflow-hidden rounded-xl border border-[#e7edf7] bg-white shadow-[0_14px_40px_rgba(15,23,42,0.05)]">
+      <div className={cn('px-6 py-1.5 text-center text-xs font-extrabold uppercase tracking-wide text-white sm:text-sm md:text-base xl:text-lg', toneBackgroundClass)}>
         {title}
       </div>
       <div className="grid grid-cols-1 divide-y divide-[#eef2f9] lg:grid-cols-3 lg:divide-x lg:divide-y-0">
@@ -368,18 +375,18 @@ function SummaryPanel({
           return (
             <div key={period} className="flex min-h-[132px] flex-col items-center justify-between px-3 py-3 text-center lg:min-h-[140px] lg:px-4 lg:py-4">
               <div>
-                <div className="text-sm font-bold uppercase tracking-wide text-[#18275d] lg:text-base">
+                <div className="text-xs font-bold uppercase tracking-wide text-[#18275d] sm:text-sm md:text-base xl:text-lg">
                   {title.includes('Gross') ? `${periodLabels[period]} Gross Profit` : `${periodLabels[period]} Sales`}
                 </div>
-                <div className={cn('mt-2 text-2xl font-black tracking-tight lg:text-3xl', toneColorClass)}>
+                <div className={cn('mt-2 text-xl font-black tracking-tight sm:text-2xl md:text-3xl xl:text-4xl', toneColorClass)}>
                   {primaryValue}
                 </div>
-                <div className="mt-2 text-xs font-semibold text-[#2e457e] lg:text-sm">
+                <div className="mt-2 text-xs font-semibold text-[#2e457e] md:text-sm xl:text-base">
                   {previousValue}
                 </div>
               </div>
 
-              <div className={cn('inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-bold lg:text-base', isPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600')}>
+              <div className={cn('inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold sm:text-sm md:text-base', isPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600')}>
                 {isPositive ? <PiArrowUpRight /> : <PiArrowDownRight />}
                 <span>{item ? `${Math.abs(computedChange).toFixed(1)}%` : '--'}</span>
               </div>
