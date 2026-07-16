@@ -100,7 +100,7 @@ export default function SalesPerformanceDashboard() {
   useEffect(() => {
     let mounted = true;
 
-    fetchSalesPerformance()
+    fetchSalesPerformance(siteId)
       .then((response) => {
         if (mounted) {
           setSource(response);
@@ -116,7 +116,7 @@ export default function SalesPerformanceDashboard() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [siteId]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
