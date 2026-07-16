@@ -11,18 +11,19 @@ import { buildSalesPerformanceDashboard } from '@/services/sales-performance/sal
 import type { SalesPerformancePeriod } from '@/services/sales-performance/sales-performance.interface';
 
 const periodLabels: Record<SalesPerformancePeriod, string> = {
+  wtd: 'WTD',
   mtd: 'MTD',
   qtd: 'QTD',
   ytd: 'YTD',
 };
 
-const periodCarousel: SalesPerformancePeriod[] = ['mtd', 'qtd', 'ytd'];
+const periodCarousel: SalesPerformancePeriod[] = ['wtd', 'mtd', 'qtd', 'ytd'];
 
 const colors = {
-  sales: '#1d63f2',
-  salesLight: '#c5d8ff',
-  profit: '#ff5d14',
-  profitLight: '#0b8ea8',
+  sales: '#14b8a6',
+  salesLight: '#2dd4bf',
+  profit: '#d97706',
+  profitLight: '#fcd34d',
 };
 
 function buildPercentDomain(values: number[], fallbackMax: number): [number, number] {
@@ -58,9 +59,26 @@ function buildSalesDomain(values: number[]): [number, number] {
 }
 
 export default function SalesPerformanceDashboard() {
-  const [period, setPeriod] = useState<SalesPerformancePeriod>('mtd');
+  const [period, setPeriod] = useState<SalesPerformancePeriod>('wtd');
+  const [currentSiteId, setCurrentSiteId] = useState<string | null>(null);
   const [source, setSource] = useState<SalesPerformanceDashboardType['source'] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [screenWidth, setScreenWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1920);
+
+  // Extract currentSiteId from query parameter on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const siteId = params.get('siteId');
+      setCurrentSiteId(siteId);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -103,9 +121,8 @@ export default function SalesPerformanceDashboard() {
   const chartRows = useMemo(() => {
     const rows = dashboard?.chartRows ?? [];
     return [...rows].sort((a, b) => {
-      const siteIdA = parseInt(a.siteId ?? '0', 10);
-      const siteIdB = parseInt(b.siteId ?? '0', 10);
-      return siteIdA - siteIdB;
+      // Sort by sales amount descending (highest to lowest)
+      return (b.salesAmt ?? 0) - (a.salesAmt ?? 0);
     });
   }, [dashboard]);
   const salesDomain = useMemo<[number, number]>(() => {
@@ -113,34 +130,47 @@ export default function SalesPerformanceDashboard() {
     return buildSalesDomain(values);
   }, [chartRows]);
 
-  const profitDomain: [number, number] = [0, 50];
+  // Responsive font sizing based on screen width
+  const responsiveFontSizes = useMemo(() => {
+    if (screenWidth < 640) return { xAxisLabel: 11, numberLabel: 9, xTickHeight: 48 };
+    if (screenWidth < 1024) return { xAxisLabel: 13, numberLabel: 11, xTickHeight: 56 };
+    if (screenWidth < 1536) return { xAxisLabel: 16, numberLabel: 13, xTickHeight: 64 };
+    if (screenWidth < 2560) return { xAxisLabel: 18, numberLabel: 15, xTickHeight: 80 };
+    return { xAxisLabel: 22, numberLabel: 18, xTickHeight: 96 }; // 65"+ displays
+  }, [screenWidth]);
 
   const currentPeriodLabel = periodLabels[period];
   const xTickInterval = 0;
   const xTickAngle = chartRows.length > 12 ? -45 : 0;
-  const xTickHeight = chartRows.length > 16 ? 64 : 42;
+  const xTickHeight = chartRows.length > 16 ? responsiveFontSizes.xTickHeight : Math.max(responsiveFontSizes.xTickHeight - 16, 40);
   const barSize = useMemo(() => {
-    // Fixed base size without screen scaling
-    return chartRows.length > 24 ? 12 : chartRows.length > 16 ? 14 : 18;
-  }, [chartRows.length]);
+    // Scale bar size based on both screen width AND item count
+    const baseMultiplier = screenWidth < 1024 ? 0.8 : screenWidth < 1536 ? 1 : screenWidth < 2560 ? 1.2 : 1.5;
+    const itemCount = chartRows.length;
+    if (itemCount > 24) return Math.round(16 * baseMultiplier);
+    if (itemCount > 16) return Math.round(20 * baseMultiplier);
+    return Math.round(24 * baseMultiplier);
+  }, [chartRows.length, screenWidth]);
   const salesCenterShift = barSize / 2 + 2;
 
   return (
-    <div className="h-screen overflow-hidden bg-white text-[--sales-text]">
+    <div className="h-screen overflow-hidden bg-gray-50 text-gray-700 dark:bg-gray-50 dark:text-gray-700" data-theme="dark">
       <div className="flex h-full w-full flex-col gap-1.5">
         <header className="grid grid-cols-[1fr_auto_1fr] items-center px-0 py-1">
-          <div />
-          <h1 className="text-center text-sm font-extrabold uppercase tracking-[0.05em] text-[#122263] sm:text-base md:text-lg xl:text-xl 2xl:text-2xl">
+          <div className="text-sm font-extrabold uppercase tracking-[0.05em] text-gray-700 dark:text-gray-700 sm:text-base md:text-lg xl:text-xl 2xl:text-2xl">
+            {currentSiteId && <span>Site# {currentSiteId}</span>}
+          </div>
+          <h1 className="text-center text-sm font-extrabold uppercase tracking-[0.05em] text-gray-700 dark:text-gray-700 sm:text-base md:text-lg xl:text-xl 2xl:text-2xl">
             Sales Performance Dashboard
           </h1>
-          <p className="justify-self-end inline-flex items-center gap-1.5 text-xs font-semibold text-[#1c2f69] md:text-sm xl:text-base">
-            <PiInfo className="size-4 text-[#1d63f2]" />
+          <p className="justify-self-end inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-500 md:text-sm xl:text-base">
+            <PiInfo className="size-4 text-blue-600 dark:text-blue-400" />
             <span>The dashboard data is as of till yesterday</span>
           </p>
         </header>
 
         {error ? (
-          <div className="rounded-3xl border border-rose-200 bg-white p-6 text-sm text-rose-700 shadow-[0_12px_35px_rgba(17,31,70,0.06)]">
+          <div className="rounded-3xl border border-red-700 dark:border-red-400 bg-red-50 dark:bg-red-950 p-6 text-sm text-red-700 dark:text-red-300 shadow-[0_12px_35px_rgba(0,0,0,0.3)]">
             {error}
           </div>
         ) : null}
@@ -152,36 +182,28 @@ export default function SalesPerformanceDashboard() {
             metricKey="sales"
             dashboard={dashboard}
           />
-          <SummaryPanel
-            title="Gross Profit Performance"
-            accent="orange"
-            metricKey="grossProfit"
-            dashboard={dashboard}
-          />
         </div>
 
-        <section className="min-h-0 flex flex-1 flex-col rounded-xl border border-[#e7edf7] bg-white p-3 shadow-[0_14px_40px_rgba(15,23,42,0.05)] sm:p-4 lg:p-5">
+        <section className="min-h-0 flex flex-1 flex-col rounded-xl border border-gray-200 dark:border-gray-200 bg-white dark:bg-gray-100 p-3 shadow-[0_14px_40px_rgba(0,0,0,0.1)] dark:shadow-[0_14px_40px_rgba(0,0,0,0.3)] sm:p-4 lg:p-5">
           <div>
-            <h2 className="text-lg font-extrabold tracking-tight text-[#122263] sm:text-xl md:text-2xl xl:text-3xl">
+            <h2 className="text-lg font-extrabold tracking-tight text-gray-700 dark:text-gray-700 sm:text-xl md:text-2xl xl:text-3xl">
               {currentPeriodLabel} Sales by Site{' '}
-              <span className="text-sm font-semibold text-[#41507a] sm:text-base md:text-lg xl:text-xl">(vs Last Year {currentPeriodLabel})</span>
+              <span className="text-sm font-semibold text-gray-600 dark:text-gray-600 sm:text-base md:text-lg xl:text-xl">(vs Last Year {currentPeriodLabel})</span>
             </h2>
-            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-[#29407c] sm:text-sm md:text-base">
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-gray-600 dark:text-gray-600 sm:text-sm md:text-base">
               <LegendDot color={colors.sales} label={`${currentPeriodLabel} Sales (Current)`} solid />
               <LegendDot color={colors.salesLight} label={`${currentPeriodLabel} Sales (Last Year)`} dashed />
-              <LegendDot color={colors.profit} label={`Profit % (${currentPeriodLabel}) (Current)`} solid line />
-              <LegendDot color={colors.profitLight} label={`Profit % (${currentPeriodLabel}) (Last Year)`} dashed line />
             </div>
           </div>
 
-          <div className="mt-3 min-h-0 flex-1 rounded-lg bg-white pb-1">
+          <div className="mt-3 min-h-0 flex-1 rounded-lg bg-white dark:bg-gray-100 pb-1">
             <div className="h-full w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={chartRows}
                   margin={{ top: 44, right: 18, bottom: 14, left: 10 }}
                   barCategoryGap={18}
-                  className="[&_.recharts-cartesian-axis-tick-value]:fill-[#29407c] [&_.recharts-cartesian-grid-vertical]:opacity-0"
+                  className="[&_.recharts-cartesian-axis-tick-value]:fill-gray-600 dark:[&_.recharts-cartesian-axis-tick-value]:fill-gray-600 [&_.recharts-cartesian-grid-vertical]:opacity-0"
                 >
                   <defs>
                     <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
@@ -193,17 +215,17 @@ export default function SalesPerformanceDashboard() {
                       <stop offset="100%" stopColor={colors.salesLight} stopOpacity={0.35} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="#e7edf7" strokeDasharray="4 8" vertical={false} />
+                  <CartesianGrid stroke="rgb(var(--muted))" strokeDasharray="4 8" vertical={false} />
                   <XAxis
                     dataKey="siteId"
                     axisLine={false}
                     tickLine={false}
-                    tickMargin={14}
+                    tickMargin={16}
                     angle={xTickAngle}
                     textAnchor={xTickAngle !== 0 ? 'end' : 'middle'}
                     height={xTickHeight}
                     interval={xTickInterval}
-                    tick={{ fontSize: 13, fontWeight: 700, fill: '#122263' }}
+                    tick={{ fontSize: responsiveFontSizes.xAxisLabel, fontWeight: 700, fill: 'rgb(var(--foreground))' }}
                   />
                   <YAxis
                     yAxisId="left"
@@ -214,37 +236,14 @@ export default function SalesPerformanceDashboard() {
                     domain={salesDomain}
                     tickFormatter={(value) => formatNumber(value)}
                   />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    axisLine={false}
-                    tickLine={false}
-                    tickMargin={14}
-                    width={52}
-                    domain={profitDomain}
-                    allowDataOverflow
-                    ticks={[0, 10, 20, 30, 40, 50]}
-                    tickFormatter={(value) => `${value}%`}
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="linear"
-                    dataKey={(row: { lastYearProfitPct?: number; profitPct?: number }) =>
-                      row.lastYearProfitPct ?? row.profitPct ?? 0
-                    }
-                    name={`Profit % (${currentPeriodLabel}) (Last Year)`}
-                    stroke={colors.profitLight}
-                    strokeWidth={4.5}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeDasharray="6 6"
-                    dot={{ r: 7, fill: '#fff', stroke: colors.profitLight, strokeWidth: 2.4 }}
-                    activeDot={false}
-                    isAnimationActive={false}
-                    connectNulls
-                    opacity={0.9}
-                  />
-                  <Bar yAxisId="left" dataKey="salesAmt" name={`${currentPeriodLabel} Sales (Current)`} fill="url(#salesFill)" barSize={barSize} radius={[8, 8, 0, 0]}>
+                  <Bar 
+                    yAxisId="left" 
+                    dataKey="salesAmt" 
+                    name={`${currentPeriodLabel} Sales (Current)`} 
+                    fill="url(#salesFill)"
+                    barSize={barSize}
+                    radius={[8, 8, 0, 0]}
+                  >
                     <LabelList
                       dataKey="salesAmt"
                       content={(props) => (
@@ -252,6 +251,7 @@ export default function SalesPerformanceDashboard() {
                           {...props}
                           mode="current"
                           centerShift={salesCenterShift}
+                          fontSize={responsiveFontSizes.numberLabel}
                         />
                       )}
                     />
@@ -264,61 +264,11 @@ export default function SalesPerformanceDashboard() {
                           {...props}
                           mode="lastYear"
                           centerShift={salesCenterShift}
+                          fontSize={responsiveFontSizes.numberLabel}
                         />
                       )}
                     />
                   </Bar>
-                  <Line
-                    yAxisId="right"
-                    type="linear"
-                    dataKey="profitPct"
-                    name={`Profit % (${currentPeriodLabel}) (Current)`}
-                    stroke={colors.profit}
-                    strokeWidth={3}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    dot={{ r: 5, fill: '#fff', stroke: colors.profit, strokeWidth: 2 }}
-                    activeDot={false}
-                    isAnimationActive={false}
-                    connectNulls
-                  >
-                    <LabelList
-                      dataKey="profitPct"
-                      content={(props) => (
-                        <LineValueLabel
-                          {...props}
-                          mode="current"
-                        />
-                      )}
-                    />
-                  </Line>
-                  <Line
-                    yAxisId="right"
-                    type="linear"
-                    dataKey={(row: { lastYearProfitPct?: number; profitPct?: number }) =>
-                      row.lastYearProfitPct ?? row.profitPct ?? 0
-                    }
-                    name={`Profit % (${currentPeriodLabel}) (Last Year) Labels`}
-                    stroke="transparent"
-                    strokeWidth={0}
-                    dot={false}
-                    activeDot={false}
-                    isAnimationActive={false}
-                    connectNulls
-                    legendType="none"
-                  >
-                    <LabelList
-                      dataKey={(row: { lastYearProfitPct?: number; profitPct?: number }) =>
-                        row.lastYearProfitPct ?? row.profitPct ?? 0
-                      }
-                      content={(props) => (
-                        <LineValueLabel
-                          {...props}
-                          mode="lastYear"
-                        />
-                      )}
-                    />
-                  </Line>
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -355,7 +305,7 @@ function SummaryPanel({
 }: {
   title: string;
   accent: 'blue' | 'orange';
-  metricKey: 'sales' | 'grossProfit';
+  metricKey: 'sales';
   dashboard: SalesPerformanceDashboardType | null;
 }) {
   const toneColorClass = accent === 'blue' ? 'text-[#1d63f2]' : 'text-[#ff5d14]';
@@ -363,14 +313,14 @@ function SummaryPanel({
   const summary = dashboard?.[metricKey] ?? null;
   const isSalesMetric = metricKey === 'sales';
 
-  const periods = ['mtd', 'qtd', 'ytd'] as const;
+  const periods = ['wtd', 'mtd', 'qtd', 'ytd'] as const;
 
   return (
-    <section className="overflow-hidden rounded-xl border border-[#e7edf7] bg-white shadow-[0_14px_40px_rgba(15,23,42,0.05)]">
+    <section className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-200 bg-white dark:bg-gray-100 shadow-[0_14px_40px_rgba(15,23,42,0.05)] dark:shadow-[0_14px_40px_rgba(0,0,0,0.1)]">
       <div className={cn('px-6 py-1.5 text-center text-xs font-extrabold uppercase tracking-wide text-white sm:text-sm md:text-base xl:text-lg', toneBackgroundClass)}>
         {title}
       </div>
-      <div className="grid grid-cols-1 divide-y divide-[#eef2f9] lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+      <div className="grid grid-cols-1 divide-y divide-gray-200 dark:divide-gray-200 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
         {periods.map((period) => {
           const item = summary?.[period] ?? null;
           const computedChange = item ? item.change : 0;
@@ -389,18 +339,18 @@ function SummaryPanel({
           return (
             <div key={period} className="flex min-h-[132px] flex-col items-center justify-between px-3 py-3 text-center lg:min-h-[140px] lg:px-4 lg:py-4">
               <div>
-                <div className="text-xs font-bold uppercase tracking-wide text-[#18275d] sm:text-sm md:text-base xl:text-lg">
+                <div className="text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-600 sm:text-sm md:text-base xl:text-lg">
                   {title.includes('Gross') ? `${periodLabels[period]} Gross Profit` : `${periodLabels[period]} Sales`}
                 </div>
                 <div className={cn('mt-2 text-xl font-black tracking-tight sm:text-2xl md:text-3xl xl:text-4xl', toneColorClass)}>
                   {primaryValue}
                 </div>
-                <div className="mt-2 text-xs font-semibold text-[#2e457e] md:text-sm xl:text-base">
+                <div className="mt-2 text-xs font-semibold text-gray-600 dark:text-gray-600 md:text-sm xl:text-base">
                   {previousValue}
                 </div>
               </div>
 
-              <div className={cn('inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold sm:text-sm md:text-base', isPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600')}>
+              <div className={cn('inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold sm:text-sm md:text-base', isPositive ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-400')}>
                 {isPositive ? <PiArrowUpRight /> : <PiArrowDownRight />}
                 <span>{item ? `${Math.abs(computedChange).toFixed(1)}%` : '--'}</span>
               </div>
@@ -502,6 +452,7 @@ function SalesFlatRowLabel({
   payload,
   mode,
   centerShift,
+  fontSize,
 }: {
   x?: number | string;
   y?: number | string;
@@ -509,6 +460,7 @@ function SalesFlatRowLabel({
   payload?: any;
   mode: 'current' | 'lastYear';
   centerShift?: number;
+  fontSize?: number;
 }) {
   const px = typeof x === 'string' ? Number(x) : (x ?? 0);
   const py = typeof y === 'string' ? Number(y) : (y ?? 0);
@@ -531,14 +483,17 @@ function SalesFlatRowLabel({
   const xAligned = isCurrent 
     ? px + (centerShift ?? 0)    // Current bar shifts right to center
     : px - (centerShift ?? 0);   // Previous bar shifts left to center
-  const textColor = isCurrent ? '#0f46c8' : '#5f7194';
-  const strokeColor = isCurrent ? '#cfe0ff' : '#d7e0ef';
-  const fillColor = isCurrent ? '#f7faff' : '#fbfcff';
+  const textColor = isCurrent ? '#14b8a6' : '#2dd4bf';
+  const strokeColor = isCurrent ? '#0d7a6e' : '#1a9a8a';
+  const fillColor = isCurrent ? '#f0fdf9' : '#f5fefe';
+  const labelFontSize = fontSize ?? 13;
+  const labelHeight = Math.max(labelFontSize + 6, 20);
+  const labelY = labelHeight * 0.75;
 
   return (
     <g transform={`translate(${xAligned - textWidth / 2},${yPosition})`}>
-      <rect width={textWidth} height={16} rx={5} fill={fillColor} fillOpacity={1} stroke={strokeColor} />
-      <text x={textWidth / 2} y={12} textAnchor="middle" fontSize="10" fontWeight="700" fill={textColor}>
+      <rect width={textWidth} height={labelHeight} rx={6} fill={fillColor} fillOpacity={1} stroke={strokeColor} />
+      <text x={textWidth / 2} y={labelY} textAnchor="middle" fontSize={labelFontSize} fontWeight="700" fill={textColor}>
         {text}
       </text>
     </g>
