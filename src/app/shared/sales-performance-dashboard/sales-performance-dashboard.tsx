@@ -169,16 +169,18 @@ export default function SalesPerformanceDashboard() {
   const labelRounding = isLargeScreen ? 8 : 5;
   const labelYPrevious = isLargeScreen ? 58 : 26;
   const barSize = useMemo(() => {
-    // Fixed base size without screen scaling
-    return chartRows.length > 24 ? 12 : chartRows.length > 16 ? 14 : 18;
-  }, [chartRows.length]);
+    // Base size based on number of rows
+    const baseSize = chartRows.length > 24 ? 12 : chartRows.length > 16 ? 14 : 18;
+    // Increase bar size for large screens (65" TV)
+    return isLargeScreen ? baseSize + 16 : baseSize;
+  }, [chartRows.length, isLargeScreen]);
   const salesCenterShift = barSize / 2 + 2;
 
   return (
     <div className="h-screen overflow-hidden bg-slate-900 text-slate-100">
       <div className="flex h-full w-full flex-col gap-1.5">
         <header className="grid grid-cols-[1fr_auto_1fr] items-center px-0 py-1 bg-slate-800 border-b border-slate-700">
-          <div className="text-sm font-extrabold uppercase tracking-[0.05em] text-blue-400 sm:text-base md:text-lg xl:text-xl 2xl:text-2xl">
+          <div className="px-4 py-2 text-sm font-extrabold uppercase tracking-[0.05em] text-blue-400 sm:text-base md:text-lg xl:text-xl 2xl:text-2xl">
             DK Tire {siteId && `- ${siteId}`}
           </div>
           <h1 className="text-center text-sm font-extrabold uppercase tracking-[0.05em] text-blue-400 sm:text-base md:text-lg xl:text-xl 2xl:text-2xl">
@@ -226,6 +228,8 @@ export default function SalesPerformanceDashboard() {
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-slate-300 sm:text-sm md:text-base">
               <LegendDot color={colors.sales} label={`${currentPeriodLabel} Sales (Current)`} solid />
               <LegendDot color={colors.salesPrev} label={`${currentPeriodLabel} Sales (Last Year)`} dashed />
+              <LegendDot color={colors.profit} label={`${currentPeriodLabel} Profit % (Current)`} solid />
+              <LegendDot color={colors.profitLight} label={`${currentPeriodLabel} Profit % (Last Year)`} dashed />
             </div>
           </div>
 
@@ -266,7 +270,13 @@ export default function SalesPerformanceDashboard() {
                     textAnchor={xTickAngle !== 0 ? 'end' : 'middle'}
                     height={xTickHeight}
                     interval={xTickInterval}
-                    tick={{ fontSize: xTickFontSize, fontWeight: 700, fill: '#94a3b8' }}
+                    tick={(props) => (
+                      <CustomXAxisTick
+                        {...props}
+                        chartData={chartRows}
+                        selectedSiteId={siteId}
+                      />
+                    )}
                   />
                   <YAxis
                     yAxisId="left"
@@ -293,54 +303,28 @@ export default function SalesPerformanceDashboard() {
                     {chartRows.map((row, index) => (
                       <Cell key={`salesAmt-${index}`} fill={row.siteId === siteId ? 'url(#salesFillCurrentSite)' : 'url(#salesFill)'} />
                     ))}
-                    <LabelList
-                      dataKey="salesAmt"
-                      content={(props) => (
-                        <SalesFlatRowLabel
-                          {...props}
-                          mode="current"
-                          centerShift={salesCenterShift}
-                          selectedSiteId={siteId}
-                          colors={colors}
-                          isLargeScreen={isLargeScreen}
-                          labelFontSize={labelFontSize}
-                          labelBoxHeight={labelBoxHeight}
-                          labelTextMultiplier={labelTextMultiplier}
-                          labelPaddingMultiplier={labelPaddingMultiplier}
-                          labelMinWidth={labelMinWidth}
-                          labelStrokeWidth={labelStrokeWidth}
-                          labelRounding={labelRounding}
-                          labelYPrevious={labelYPrevious}
-                        />
-                      )}
-                    />
                   </Bar>
                   <Bar yAxisId="left" dataKey="lastYearSalesAmt" name={`${currentPeriodLabel} Sales (Last Year)`} fill="url(#salesOutline)" barSize={barSize} radius={[8, 8, 0, 0]}>
                     {chartRows.map((row, index) => (
                       <Cell key={`lastYearSalesAmt-${index}`} fill={row.siteId === siteId ? 'url(#salesOutlineCurrentSite)' : 'url(#salesOutline)'} />
                     ))}
+                  </Bar>
+                  <Line yAxisId="right" dataKey="profitPct" name={`${currentPeriodLabel} Profit %`} stroke={colors.profit} strokeWidth={3} dot={false} isAnimationActive={false}>
                     <LabelList
-                      dataKey="lastYearSalesAmt"
+                      dataKey="profitPct"
                       content={(props) => (
-                        <SalesFlatRowLabel
-                          {...props}
-                          mode="lastYear"
-                          centerShift={salesCenterShift}
-                          selectedSiteId={siteId}
-                          colors={colors}
-                          isLargeScreen={isLargeScreen}
-                          labelFontSize={labelFontSize}
-                          labelBoxHeight={labelBoxHeight}
-                          labelTextMultiplier={labelTextMultiplier}
-                          labelPaddingMultiplier={labelPaddingMultiplier}
-                          labelMinWidth={labelMinWidth}
-                          labelStrokeWidth={labelStrokeWidth}
-                          labelRounding={labelRounding}
-                          labelYPrevious={labelYPrevious}
-                        />
+                        <LineValueLabel {...props} mode="current" />
                       )}
                     />
-                  </Bar>
+                  </Line>
+                  <Line yAxisId="right" dataKey="lastYearProfitPct" name={`${currentPeriodLabel} Profit % (Last Year)`} stroke={colors.profitLight} strokeWidth={3} strokeDasharray="8 4" dot={false} isAnimationActive={false}>
+                    <LabelList
+                      dataKey="lastYearProfitPct"
+                      content={(props) => (
+                        <LineValueLabel {...props} mode="lastYear" />
+                      )}
+                    />
+                  </Line>
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -622,6 +606,87 @@ function LineValueLabel({
       <rect width={width} height={18} rx={6} fill="#ffffff" fillOpacity={0.95} stroke="#f1f5ff" />
       <text x={width / 2} y={13} textAnchor="middle" fontSize="11" fontWeight="700" fill={fill}>
         {text}
+      </text>
+    </g>
+  );
+}
+
+function CustomXAxisTick({
+  x,
+  y,
+  payload,
+  chartData,
+  selectedSiteId,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value: string | number };
+  chartData?: any[];
+  selectedSiteId?: string | null;
+}) {
+  if (!x || !y || !payload || !chartData) {
+    return null;
+  }
+
+  const siteId = String(payload.value);
+  const rowData = chartData.find((row) => row.siteId === siteId);
+  const isSelected = siteId === selectedSiteId;
+  const currentColor = isSelected ? '#ef4444' : '#3b82f6'; // red for selected, blue for others
+  const prevColor = isSelected ? '#fbbf24' : '#94a3b8'; // amber for selected, slate for others
+  const siteIdColor = isSelected ? '#ef4444' : '#94a3b8'; // red for selected, slate for others
+
+  const currentSalesAmount = rowData ? formatNumber(rowData.salesAmt) : '-';
+  const prevSalesAmount = rowData ? formatNumber(rowData.lastYearSalesAmt) : '-';
+
+  const boxWidth = 100;
+  const boxHeight = 48;
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        textAnchor="middle"
+        dominantBaseline="hanging"
+        fontSize={16}
+        fontWeight={700}
+        fill={siteIdColor}
+      >
+        {siteId}
+      </text>
+      
+      <rect
+        x={-boxWidth / 2}
+        y={24}
+        width={boxWidth}
+        height={boxHeight}
+        rx={6}
+        fill="#1e293b"
+        stroke="#475569"
+        strokeWidth={1}
+      />
+      
+      <text
+        x={0}
+        y={30}
+        textAnchor="middle"
+        dominantBaseline="hanging"
+        fontSize={12}
+        fontWeight={600}
+        fill={currentColor}
+      >
+        {currentSalesAmount}
+      </text>
+      <text
+        x={0}
+        y={46}
+        textAnchor="middle"
+        dominantBaseline="hanging"
+        fontSize={11}
+        fontWeight={500}
+        fill={prevColor}
+      >
+        {prevSalesAmount}
       </text>
     </g>
   );
