@@ -1,4 +1,4 @@
-export type SalesPerformancePeriod = 'mtd' | 'qtd' | 'ytd';
+export type SalesPerformancePeriod = 'wtd' | 'mtd' | 'qtd' | 'ytd';
 
 export type SalesPerformanceMetric = {
   current: number;
@@ -22,6 +22,7 @@ export type SalesPerformanceSiteMetric = {
 
 export type SalesPerformanceSiteItem = {
   site_id: string;
+  wtd: SalesPerformanceSiteMetric;
   mtd: SalesPerformanceSiteMetric;
   qtd: SalesPerformanceSiteMetric;
   ytd: SalesPerformanceSiteMetric;

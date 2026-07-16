@@ -101,13 +101,29 @@ export function buildSalesPerformanceDashboard(
     selectedSites.reduce((sum, item) => sum + item.profit_pct, 0) /
     Math.max(selectedSites.length, 1);
 
+  // Create safe WTD fallback with zeros
+  const wtdFallback: SalesPerformanceMetric = {
+    current: 0,
+    prev: 0,
+    pct_change: 0,
+    trend: 'DOWN',
+    current_pct: 0,
+    prev_pct: 0,
+  };
+
   return {
     sales: {
+      wtd: response.top_cards.sales.wtd 
+        ? toSalesPerformanceSummary(response.top_cards.sales.wtd)
+        : toSalesPerformanceSummary(wtdFallback),
       mtd: toSalesPerformanceSummary(response.top_cards.sales.mtd),
       qtd: toSalesPerformanceSummary(response.top_cards.sales.qtd),
       ytd: toSalesPerformanceSummary(response.top_cards.sales.ytd),
     },
     grossProfit: {
+      wtd: response.top_cards.gross_profit.wtd && response.top_cards.sales.wtd
+        ? toGrossProfitSummary(response.top_cards.gross_profit.wtd, response.top_cards.sales.wtd)
+        : toGrossProfitSummary(wtdFallback, wtdFallback),
       mtd: toGrossProfitSummary(response.top_cards.gross_profit.mtd, response.top_cards.sales.mtd),
       qtd: toGrossProfitSummary(response.top_cards.gross_profit.qtd, response.top_cards.sales.qtd),
       ytd: toGrossProfitSummary(response.top_cards.gross_profit.ytd, response.top_cards.sales.ytd),
