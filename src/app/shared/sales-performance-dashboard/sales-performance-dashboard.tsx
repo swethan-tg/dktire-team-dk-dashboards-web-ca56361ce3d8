@@ -19,7 +19,16 @@ const periodLabels: Record<SalesPerformancePeriod, string> = {
 
 const periodCarousel: SalesPerformancePeriod[] = ['wtd', 'mtd', 'qtd', 'ytd'];
 
-const colors = {
+type ColorsType = {
+  sales: string;
+  salesPrev: string;
+  profit: string;
+  profitLight: string;
+  currentSite: string;
+  currentSitePrev: string;
+};
+
+const colors: ColorsType = {
   sales: '#3b82f6',           // blue (current for other sites)
   salesPrev: '#94a3b8',       // slate-400 (previous for other sites)
   profit: '#f97316',
@@ -76,6 +85,15 @@ export default function SalesPerformanceDashboard() {
       checkScreenSize();
       window.addEventListener('resize', checkScreenSize);
       return () => window.removeEventListener('resize', checkScreenSize);
+    }
+  }, []);
+
+  // Extract site_id from query parameter on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('site_id');
+      setSiteId(id);
     }
   }, []);
 
@@ -207,7 +225,7 @@ export default function SalesPerformanceDashboard() {
             </h2>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-slate-300 sm:text-sm md:text-base">
               <LegendDot color={colors.sales} label={`${currentPeriodLabel} Sales (Current)`} solid />
-              <LegendDot color={colors.salesLight} label={`${currentPeriodLabel} Sales (Last Year)`} dashed />
+              <LegendDot color={colors.salesPrev} label={`${currentPeriodLabel} Sales (Last Year)`} dashed />
             </div>
           </div>
 
@@ -632,7 +650,7 @@ function SalesFlatRowLabel({
   mode: 'current' | 'lastYear';
   centerShift?: number;
   selectedSiteId?: string | null;
-  colors?: typeof colors;
+  colors?: ColorsType;
   isLargeScreen?: boolean;
   labelFontSize?: number;
   labelBoxHeight?: number;

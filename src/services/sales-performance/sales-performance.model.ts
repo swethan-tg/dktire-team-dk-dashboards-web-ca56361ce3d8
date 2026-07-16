@@ -3,6 +3,7 @@ import type {
   SalesPerformanceResponse,
   SalesPerformancePeriod,
   SalesPerformanceSiteItem,
+  SalesPerformanceMetric,
 } from './sales-performance.interface';
 
 export type SalesPerformancePeriodSummary = {
