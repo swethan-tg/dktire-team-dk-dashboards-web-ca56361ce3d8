@@ -1,4 +1,4 @@
-export type SalesPerformancePeriod = 'wtd' | 'mtd' | 'qtd' | 'ytd';
+export type SalesPerformancePeriod = 'mtd' | 'qtd' | 'ytd';
 
 export type SalesPerformanceMetric = {
   current: number;
@@ -22,7 +22,6 @@ export type SalesPerformanceSiteMetric = {
 
 export type SalesPerformanceSiteItem = {
   site_id: string;
-  wtd?: SalesPerformanceSiteMetric;
   mtd: SalesPerformanceSiteMetric;
   qtd: SalesPerformanceSiteMetric;
   ytd: SalesPerformanceSiteMetric;
@@ -30,8 +29,8 @@ export type SalesPerformanceSiteItem = {
 
 export type SalesPerformanceResponse = {
   top_cards: {
-    sales: Record<SalesPerformancePeriod, SalesPerformanceMetric> & { wtd?: SalesPerformanceMetric };
-    gross_profit: Record<SalesPerformancePeriod, SalesPerformanceMetric> & { wtd?: SalesPerformanceMetric };
+    sales: Record<SalesPerformancePeriod, SalesPerformanceMetric>;
+    gross_profit: Record<SalesPerformancePeriod, SalesPerformanceMetric>;
   };
   site_performance: SalesPerformanceSiteItem[];
 };

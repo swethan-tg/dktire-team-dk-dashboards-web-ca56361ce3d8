@@ -74,18 +74,6 @@ export function mapSalesPerformanceSiteItem(
 ): SalesPerformanceChartRow {
   const value = item[period];
 
-  if (!value) {
-    return {
-      siteId: item.site_id,
-      salesAmt: 0,
-      lastYearSalesAmt: 0,
-      salesPct: 0,
-      lastYearSalesPct: 0,
-      profitPct: 0,
-      lastYearProfitPct: 0,
-    };
-  }
-
   return {
     siteId: item.site_id,
     salesAmt: value.current_sales_amt,
@@ -105,56 +93,25 @@ export function buildSalesPerformanceDashboard(
     mapSalesPerformanceSiteItem(item, period)
   );
 
-  const selectedSites = response.site_performance
-    .map((item) => item[period])
-    .filter((item) => item !== undefined);
-  
+  const selectedSites = response.site_performance.map((item) => item[period]);
   const totalSalesPct =
-    selectedSites.length > 0
-      ? selectedSites.reduce((sum, item) => sum + item.sales_pct, 0) /
-        selectedSites.length
-      : 0;
+    selectedSites.reduce((sum, item) => sum + item.sales_pct, 0) /
+    Math.max(selectedSites.length, 1);
   const averageProfitPct =
-    selectedSites.length > 0
-      ? selectedSites.reduce((sum, item) => sum + item.profit_pct, 0) /
-        selectedSites.length
-      : 0;
-
-  const salesData: Record<SalesPerformancePeriod, SalesPerformancePeriodSummary> = {
-    wtd: response.top_cards.sales.wtd 
-      ? toSalesPerformanceSummary(response.top_cards.sales.wtd)
-      : {
-          current: 0,
-          previous: 0,
-          change: 0,
-          trend: 'UP',
-          currentPercent: 0,
-          previousPercent: 0,
-        },
-    mtd: toSalesPerformanceSummary(response.top_cards.sales.mtd),
-    qtd: toSalesPerformanceSummary(response.top_cards.sales.qtd),
-    ytd: toSalesPerformanceSummary(response.top_cards.sales.ytd),
-  };
-
-  const grossProfitData: Record<SalesPerformancePeriod, SalesPerformancePeriodSummary> = {
-    wtd: response.top_cards.gross_profit.wtd && response.top_cards.sales.wtd
-      ? toGrossProfitSummary(response.top_cards.gross_profit.wtd, response.top_cards.sales.wtd)
-      : {
-          current: 0,
-          previous: 0,
-          change: 0,
-          trend: 'UP',
-          currentPercent: 0,
-          previousPercent: 0,
-        },
-    mtd: toGrossProfitSummary(response.top_cards.gross_profit.mtd, response.top_cards.sales.mtd),
-    qtd: toGrossProfitSummary(response.top_cards.gross_profit.qtd, response.top_cards.sales.qtd),
-    ytd: toGrossProfitSummary(response.top_cards.gross_profit.ytd, response.top_cards.sales.ytd),
-  };
+    selectedSites.reduce((sum, item) => sum + item.profit_pct, 0) /
+    Math.max(selectedSites.length, 1);
 
   return {
-    sales: salesData,
-    grossProfit: grossProfitData,
+    sales: {
+      mtd: toSalesPerformanceSummary(response.top_cards.sales.mtd),
+      qtd: toSalesPerformanceSummary(response.top_cards.sales.qtd),
+      ytd: toSalesPerformanceSummary(response.top_cards.sales.ytd),
+    },
+    grossProfit: {
+      mtd: toGrossProfitSummary(response.top_cards.gross_profit.mtd, response.top_cards.sales.mtd),
+      qtd: toGrossProfitSummary(response.top_cards.gross_profit.qtd, response.top_cards.sales.qtd),
+      ytd: toGrossProfitSummary(response.top_cards.gross_profit.ytd, response.top_cards.sales.ytd),
+    },
     chartRows,
     chartSummary: {
       totalSalesPct,
