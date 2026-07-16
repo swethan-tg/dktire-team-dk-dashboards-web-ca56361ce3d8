@@ -25,5 +25,13 @@ export async function fetchSalesPerformance(siteId?: string | null) {
     throw new Error(`Request failed with status ${response.status}: ${errorText}`);
   }
 
-  return (await response.json()) as SalesPerformanceResponse;
+  const data = (await response.json()) as SalesPerformanceResponse;
+  
+  // Log WTD data for debugging
+  console.log('API Response - WTD Data:', {
+    gross_profit_top: data.top_cards?.gross_profit?.wtd,
+    site_0_wtd: data.site_performance?.[0]?.wtd,
+  });
+  
+  return data;
 }

@@ -159,7 +159,7 @@ export default function SalesPerformanceDashboard() {
   const xTickHeight = isLargeScreen 
     ? (chartRows.length > 16 ? 120 : 80)
     : (chartRows.length > 16 ? 64 : 42);
-  const xTickFontSize = isLargeScreen ? 28 : 13;
+  const xTickFontSize = isLargeScreen ? 36 : 18;
   const labelFontSize = isLargeScreen ? 20 : 10;
   const labelBoxHeight = isLargeScreen ? 32 : 16;
   const labelTextMultiplier = isLargeScreen ? 14 : 6;
@@ -419,16 +419,22 @@ function SummaryPanel({
       const qtdMetric = site.qtd;
       const ytdMetric = site.ytd;
       
-      const convertSiteMetricToSummary = (metric: typeof wtdMetric) => ({
-        current: metric.current_sales_amt,
-        previous: metric.prev_sales_amt,
-        change: metric.prev_sales_amt !== 0 
-          ? ((metric.current_sales_amt - metric.prev_sales_amt) / metric.prev_sales_amt) * 100
-          : 0,
-        trend: metric.current_sales_amt >= metric.prev_sales_amt ? 'UP' as const : 'DOWN' as const,
-        currentPercent: metric.sales_pct,
-        previousPercent: metric.last_yr_sales_pct,
-      });
+      const convertSiteMetricToSummary = (metric: typeof wtdMetric) => {
+        const currentSales = metric.current_sales_amt ?? 0;
+        const prevSales = metric.prev_sales_amt ?? 0;
+        const change = prevSales !== 0 
+          ? ((currentSales - prevSales) / prevSales) * 100
+          : 0;
+        
+        return {
+          current: currentSales,
+          previous: prevSales,
+          change: Number.isFinite(change) ? change : 0,
+          trend: currentSales >= prevSales ? 'UP' as const : 'DOWN' as const,
+          currentPercent: metric.sales_pct ?? 0,
+          previousPercent: metric.last_yr_sales_pct ?? 0,
+        };
+      };
       
       return {
         wtd: convertSiteMetricToSummary(wtdMetric),
@@ -444,20 +450,17 @@ function SummaryPanel({
       const ytdMetric = site.ytd;
       
       const convertGrossProfitMetricToSummary = (metric: typeof wtdMetric) => {
-        const grossProfitPercent = metric.current_sales_amt !== 0 
-          ? (metric.gross_profit / metric.current_sales_amt) * 100 
-          : 0;
-        const grossProfitPrevPercent = metric.prev_sales_amt !== 0 
-          ? (metric.prev_gross_profit / metric.prev_sales_amt) * 100 
-          : 0;
+        // Use profit_pct directly from API instead of calculating
+        const currentProfitPct = metric.profit_pct ?? 0;
+        const prevProfitPct = metric.last_yr_profit_pct ?? 0;
         
         return {
-          current: metric.gross_profit,
-          previous: metric.prev_gross_profit,
-          change: grossProfitPercent - grossProfitPrevPercent,
-          trend: grossProfitPercent - grossProfitPrevPercent >= 0 ? 'UP' as const : 'DOWN' as const,
-          currentPercent: grossProfitPercent,
-          previousPercent: grossProfitPrevPercent,
+          current: currentProfitPct,
+          previous: prevProfitPct,
+          change: currentProfitPct - prevProfitPct,
+          trend: currentProfitPct - prevProfitPct >= 0 ? 'UP' as const : 'DOWN' as const,
+          currentPercent: currentProfitPct,
+          previousPercent: prevProfitPct,
         };
       };
       
