@@ -31,8 +31,8 @@ type ColorsType = {
 const colors: ColorsType = {
   sales: '#3b82f6',           // blue (current for other sites)
   salesPrev: '#94a3b8',       // slate-400 (previous for other sites)
-  profit: '#f97316',
-  profitLight: '#fb923c',
+  profit: '#f97316',          // orange (current year profit %)
+  profitLight: '#fcd34d',     // light yellow (last year profit %)
   currentSite: '#ef4444',     // red (current for selected site)
   currentSitePrev: '#fbbf24', // amber (previous for selected site)
 };
@@ -150,23 +150,35 @@ export default function SalesPerformanceDashboard() {
     });
   }, [dashboard]);
 
-  // Calculate fixed y-axis domain from ALL periods for consistent comparison
+  // Calculate dynamic y-axis domain based on CURRENT PERIOD ONLY for optimal spacing
   const salesDomain = useMemo<[number, number]>(() => {
-    if (!source) return [0, 10000000];
+    if (!dashboard) return [0, 10000000];
     
-    // Collect all sales values from all periods
+    // Collect sales values from current period only
     const allValues: number[] = [];
-    periodCarousel.forEach((p) => {
-      const dashboardData = buildSalesPerformanceDashboard(source, p);
-      dashboardData?.chartRows.forEach((row) => {
-        allValues.push(row.salesAmt ?? 0, row.lastYearSalesAmt ?? 0);
-      });
+    dashboard?.chartRows.forEach((row) => {
+      allValues.push(row.salesAmt ?? 0, row.lastYearSalesAmt ?? 0);
     });
 
     return buildSalesDomain(allValues.length > 0 ? allValues : [0]);
-  }, [source]);
+  }, [dashboard]);
 
-  const profitDomain: [number, number] = [0, 50];
+  // Calculate dynamic profit domain based on max profit % with padding
+  const profitDomain = useMemo<[number, number]>(() => {
+    if (!dashboard || !dashboard.chartRows) return [0, 50];
+    
+    const allProfitValues: number[] = [];
+    dashboard.chartRows.forEach((row) => {
+      allProfitValues.push(row.profitPct ?? 0, row.lastYearProfitPct ?? 0);
+    });
+    
+    if (allProfitValues.length === 0) return [0, 50];
+    
+    const maxProfit = Math.max(...allProfitValues);
+    const domainMax = Math.ceil((maxProfit / 10) * 1.1) * 10; // Round up to nearest 10 with 10% padding
+    
+    return [0, Math.max(domainMax, 25)]; // Minimum 25 for better visibility
+  }, [dashboard]);
 
   const currentPeriodLabel = periodLabels[period];
   const xTickInterval = 0;
@@ -186,10 +198,10 @@ export default function SalesPerformanceDashboard() {
   const labelRounding = isLargeScreen ? 8 : 5;
   const labelYPrevious = isLargeScreen ? 58 : 26;
   const barSize = useMemo(() => {
-    // Base size based on number of rows
-    const baseSize = chartRows.length > 24 ? 12 : chartRows.length > 16 ? 14 : 18;
+    // Base size based on number of rows - INCREASED for better visibility
+    const baseSize = chartRows.length > 24 ? 20 : chartRows.length > 16 ? 28 : 36;
     // Increase bar size for large screens (65" TV)
-    return isLargeScreen ? baseSize + 16 : baseSize;
+    return isLargeScreen ? baseSize + 24 : baseSize;
   }, [chartRows.length, isLargeScreen]);
   const salesCenterShift = barSize / 2 + 2;
 
@@ -255,7 +267,7 @@ export default function SalesPerformanceDashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={chartRows}
-                  margin={{ top: 44, right: 18, bottom: 14, left: 10 }}
+                  margin={{ top: 44, right: 8, bottom: 14, left: 5 }}
                   barCategoryGap={18}
                   className="[&_.recharts-cartesian-axis-tick-value]:fill-slate-400 [&_.recharts-cartesian-grid-vertical]:opacity-0"
                 >
@@ -318,19 +330,19 @@ export default function SalesPerformanceDashboard() {
                   />
                   <Bar yAxisId="left" dataKey="salesAmt" name={`${currentPeriodLabel} Sales (Current)`} fill="url(#salesFill)" barSize={barSize} radius={[8, 8, 0, 0]}>
                     {chartRows.map((row, index) => (
-                      <Cell key={`salesAmt-${index}`} fill={row.siteId === siteId ? 'url(#salesFillCurrentSite)' : 'url(#salesFill)'} />
+                      <Cell key={`salesAmt-${index}`} fill={String(row.siteId) === String(siteId) ? 'url(#salesFillCurrentSite)' : 'url(#salesFill)'} />
                     ))}
                   </Bar>
                   <Bar yAxisId="left" dataKey="lastYearSalesAmt" name={`${currentPeriodLabel} Sales (Last Year)`} fill="url(#salesOutline)" barSize={barSize} radius={[8, 8, 0, 0]}>
                     {chartRows.map((row, index) => (
-                      <Cell key={`lastYearSalesAmt-${index}`} fill={row.siteId === siteId ? 'url(#salesOutlineCurrentSite)' : 'url(#salesOutline)'} />
+                      <Cell key={`lastYearSalesAmt-${index}`} fill={String(row.siteId) === String(siteId) ? 'url(#salesOutlineCurrentSite)' : 'url(#salesOutline)'} />
                     ))}
                   </Bar>
                   <Line yAxisId="right" dataKey="profitPct" name={`${currentPeriodLabel} Profit %`} stroke={colors.profit} strokeWidth={3} dot={false} isAnimationActive={false}>
                     <LabelList
                       dataKey="profitPct"
                       content={(props) => (
-                        <LineValueLabel {...props} mode="current" />
+                        <LineValueLabel {...props} mode="current" chartRows={chartRows} selectedSiteId={siteId} />
                       )}
                     />
                   </Line>
@@ -338,13 +350,15 @@ export default function SalesPerformanceDashboard() {
                     <LabelList
                       dataKey="lastYearProfitPct"
                       content={(props) => (
-                        <LineValueLabel {...props} mode="lastYear" />
+                        <LineValueLabel {...props} mode="lastYear" chartRows={chartRows} selectedSiteId={siteId} />
                       )}
                     />
                   </Line>
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
+
+            {/* Selected Site Profit % Display - REMOVED */}
           </div>
 
           <div className="mt-2 shrink-0 flex justify-center">
@@ -590,11 +604,17 @@ function LineValueLabel({
   y,
   value,
   mode,
+  index,
+  chartRows,
+  selectedSiteId,
 }: {
   x?: number | string;
   y?: number | string;
   value?: number | string;
   mode: 'current' | 'lastYear';
+  index?: number;
+  chartRows?: any[];
+  selectedSiteId?: string | null;
 }) {
   const px = typeof x === 'string' ? Number(x) : x;
   const py = typeof y === 'string' ? Number(y) : y;
@@ -611,17 +631,25 @@ function LineValueLabel({
     return null;
   }
 
-  const isCurrent = mode === 'current';
-  const yShift = isCurrent ? -26 : -44;
+  // Check if this label is for the selected site
+  const isSelectedSite = index !== undefined && chartRows && selectedSiteId 
+    ? String(chartRows[index]?.siteId) === String(selectedSiteId)
+    : false;
 
-  const fill = isCurrent ? '#e24a00' : '#0a6f84';
+  const isCurrent = mode === 'current';
+  const yShift = isCurrent ? -35 : -65;
+
+  // Use red/amber for selected site, orange/emerald for others
+  const fill = isSelectedSite 
+    ? (isCurrent ? '#ef4444' : '#fbbf24')  // red for current, amber for last year (selected site)
+    : (isCurrent ? '#f97316' : '#10b981'); // orange for current, emerald for last year (other sites)
   const text = `${pvalue.toFixed(2)}%`;
-  const width = text.length * 7 + 12;
+  const width = text.length * 8 + 16;
 
   return (
     <g transform={`translate(${px - width / 2},${py + yShift})`}>
-      <rect width={width} height={18} rx={6} fill="#ffffff" fillOpacity={0.95} stroke="#f1f5ff" />
-      <text x={width / 2} y={13} textAnchor="middle" fontSize="11" fontWeight="700" fill={fill}>
+      <rect width={width} height={24} rx={6} fill="#ffffff" fillOpacity={0.95} stroke="#f1f5ff" />
+      <text x={width / 2} y={16} textAnchor="middle" fontSize="16" fontWeight="900" fill={fill}>
         {text}
       </text>
     </g>
@@ -689,7 +717,7 @@ function CustomXAxisTick({
         textAnchor="middle"
         dominantBaseline="hanging"
         fontSize={12}
-        fontWeight={600}
+        fontWeight={800}
         fill={currentColor}
       >
         {currentSalesAmount}
@@ -700,7 +728,7 @@ function CustomXAxisTick({
         textAnchor="middle"
         dominantBaseline="hanging"
         fontSize={11}
-        fontWeight={500}
+        fontWeight={800}
         fill={prevColor}
       >
         {prevSalesAmount}
