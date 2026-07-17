@@ -77,7 +77,7 @@ export default function SalesmanPerformanceDashboard() {
   useEffect(() => {
     const interval = setInterval(() => {
       setPeriod((prev) => {
-        const modes: PeriodMode[] = ['wtd_mtd', 'qtd_ytd', 'ytd'];
+        const modes: PeriodMode[] = ['wtd_mtd', 'qtd', 'ytd'];
         const currentIndex = modes.indexOf(prev);
         const nextIndex = (currentIndex + 1) % modes.length;
         return modes[nextIndex];
@@ -175,13 +175,13 @@ export default function SalesmanPerformanceDashboard() {
 
         <div className="flex h-full w-full flex-col gap-1.5 p-1.5 overflow-auto">
           {/* KPI Cards - Only show for first period in dual mode */}
-          {(period !== 'qtd_ytd' || period === 'wtd_mtd') && (
+          {(period !== 'qtd' && period !== 'ytd') && (
             <div className="grid gap-2 xl:grid-cols-2 shrink-0">
               {(() => {
                 const dashToUse = period === 'wtd_mtd' ? dashboard?.wtd : 
-                                  period === 'qtd_ytd' ? dashboard?.qtd : 
-                                  dashboard?.ytd;
-                return (
+                                  period === 'qtd' ? dashboard?.qtd : 
+                                  dashboard?.ytd ?? null;
+                return dashToUse ? (
                   <>
                     <SummaryPanel
                       title="Sales Performance"
@@ -196,7 +196,7 @@ export default function SalesmanPerformanceDashboard() {
                       dashboard={dashToUse}
                     />
                   </>
-                );
+                ) : null;
               })()}
             </div>
           )}
@@ -436,6 +436,12 @@ function SummaryPanel({
   dashboard: SalesmanDashboard | null;
 }) {
   const periods: SalesmanPeriod[] = ['wtd', 'mtd', 'qtd', 'ytd'];
+  const periodDisplayLabels: Record<SalesmanPeriod, string> = {
+    wtd: 'WTD',
+    mtd: 'MTD',
+    qtd: 'QTD',
+    ytd: 'YTD',
+  };
   const toneColorClass = accent === 'blue' ? 'text-blue-400' : 'text-orange-400';
   const toneBackgroundClass = accent === 'blue' ? 'bg-blue-600' : 'bg-orange-600';
   const isSalesMetric = metricKey === 'sales';
@@ -510,7 +516,7 @@ function SummaryPanel({
             <div key={period} className="flex min-h-[132px] flex-col items-center justify-between px-3 py-3 text-center lg:min-h-[140px] lg:px-4 lg:py-4">
               <div>
                 <div className="text-xs font-bold uppercase tracking-wide text-slate-300 sm:text-sm md:text-base xl:text-lg">
-                  {title.includes('Gross') ? `${periodLabels[period]} Gross Profit` : `${periodLabels[period]} Sales`}
+                  {title.includes('Gross') ? `${periodDisplayLabels[period]} Gross Profit` : `${periodDisplayLabels[period]} Sales`}
                 </div>
                 <div className={cn('mt-2 text-xl font-black tracking-tight sm:text-2xl md:text-3xl xl:text-4xl', toneColorClass)}>
                   {primaryValue}
