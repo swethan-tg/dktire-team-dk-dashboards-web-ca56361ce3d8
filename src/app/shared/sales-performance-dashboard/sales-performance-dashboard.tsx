@@ -144,10 +144,22 @@ export default function SalesPerformanceDashboard() {
       return salesB - salesA;
     });
   }, [dashboard]);
+
+  // Calculate fixed y-axis domain from ALL periods for consistent comparison
   const salesDomain = useMemo<[number, number]>(() => {
-    const values = chartRows.flatMap((row) => [row.salesAmt ?? 0, row.lastYearSalesAmt ?? 0]);
-    return buildSalesDomain(values);
-  }, [chartRows]);
+    if (!source) return [0, 10000000];
+    
+    // Collect all sales values from all periods
+    const allValues: number[] = [];
+    periodCarousel.forEach((p) => {
+      const dashboardData = buildSalesPerformanceDashboard(source, p);
+      dashboardData?.chartRows.forEach((row) => {
+        allValues.push(row.salesAmt ?? 0, row.lastYearSalesAmt ?? 0);
+      });
+    });
+
+    return buildSalesDomain(allValues.length > 0 ? allValues : [0]);
+  }, [source]);
 
   const profitDomain: [number, number] = [0, 50];
 
