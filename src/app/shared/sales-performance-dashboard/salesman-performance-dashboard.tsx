@@ -10,14 +10,15 @@ import { buildSalesmanDashboard } from '@/services/salesman-performance/salesman
 import type { SalesmanDashboard } from '@/services/salesman-performance/salesman-performance.model';
 import type { SalesmanPeriod } from '@/services/salesman-performance/salesman-performance.model';
 
-const periodLabels: Record<SalesmanPeriod, string> = {
-  wtd: 'WTD',
-  mtd: 'MTD',
+type PeriodMode = 'wtd_mtd' | 'qtd' | 'ytd';
+
+const periodLabels: Record<PeriodMode, string> = {
+  wtd_mtd: 'WTD / MTD',
   qtd: 'QTD',
   ytd: 'YTD',
 };
 
-const periodCarousel: SalesmanPeriod[] = ['wtd', 'mtd', 'qtd', 'ytd'];
+const periodCarousel: PeriodMode[] = ['wtd_mtd', 'qtd', 'ytd'];
 
 type ColorsType = {
   current: string;
@@ -45,7 +46,7 @@ function LegendDot({ color, label, solid = true }: { color: string; label: strin
 }
 
 export default function SalesmanPerformanceDashboard() {
-  const [period, setPeriod] = useState<SalesmanPeriod>('wtd');
+  const [period, setPeriod] = useState<PeriodMode>('wtd_mtd');
   const [siteId, setSiteId] = useState<string | null>(null);
   const [source, setSource] = useState<SalesmanDashboard['source'] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,10 +77,10 @@ export default function SalesmanPerformanceDashboard() {
   useEffect(() => {
     const interval = setInterval(() => {
       setPeriod((prev) => {
-        const periods: SalesmanPeriod[] = ['wtd', 'mtd', 'qtd', 'ytd'];
-        const currentIndex = periods.indexOf(prev);
-        const nextIndex = (currentIndex + 1) % periods.length;
-        return periods[nextIndex];
+        const modes: PeriodMode[] = ['wtd_mtd', 'qtd_ytd', 'ytd'];
+        const currentIndex = modes.indexOf(prev);
+        const nextIndex = (currentIndex + 1) % modes.length;
+        return modes[nextIndex];
       });
     }, 60000); // 60 seconds = 1 minute
 
@@ -111,11 +112,40 @@ export default function SalesmanPerformanceDashboard() {
 
   const dashboard = useMemo(() => {
     if (!source) return null;
-    return buildSalesmanDashboard(source, period);
+    
+    // Map PeriodMode to actual periods to fetch
+    if (period === 'wtd_mtd') {
+      const wtdDash = buildSalesmanDashboard(source, 'wtd');
+      const mtdDash = buildSalesmanDashboard(source, 'mtd');
+      return { wtd: wtdDash, mtd: mtdDash };
+    } else if (period === 'qtd') {
+      return { qtd: buildSalesmanDashboard(source, 'qtd') };
+    } else {
+      // period === 'ytd'
+      return { ytd: buildSalesmanDashboard(source, 'ytd') };
+    }
   }, [source, period]);
 
-  const chartRows = dashboard?.chartRows ?? [];
-  const currentPeriodLabel = periodLabels[period];
+  const chartRows = useMemo(() => {
+    if (!dashboard) return { left: [], right: [] };
+    
+    if ('wtd' in dashboard) {
+      return {
+        left: dashboard.wtd?.chartRows ?? [],
+        right: dashboard.mtd?.chartRows ?? [],
+      };
+    } else if ('qtd' in dashboard) {
+      return {
+        left: dashboard.qtd?.chartRows ?? [],
+        right: [],
+      };
+    } else {
+      return {
+        left: dashboard.ytd?.chartRows ?? [],
+        right: [],
+      };
+    }
+  }, [dashboard]);
 
   // Responsive sizing
   const barSize = isLargeScreen ? 48 : 18;
@@ -143,105 +173,240 @@ export default function SalesmanPerformanceDashboard() {
           </div>
         ) : null}
 
-        <div className="flex h-full w-full flex-col gap-1.5 overflow-hidden p-1.5">
-          {/* KPI Cards */}
-          <div className="grid gap-2 xl:grid-cols-2">
-            <SummaryPanel
-              title="Sales Performance"
-              accent="blue"
-              metricKey="sales"
-              dashboard={dashboard}
-            />
-            <SummaryPanel
-              title="Gross Profit Performance"
-              accent="orange"
-              metricKey="grossProfit"
-              dashboard={dashboard}
-            />
-          </div>
+        <div className="flex h-full w-full flex-col gap-1.5 p-1.5 overflow-auto">
+          {/* KPI Cards - Only show for first period in dual mode */}
+          {(period !== 'qtd_ytd' || period === 'wtd_mtd') && (
+            <div className="grid gap-2 xl:grid-cols-2 shrink-0">
+              {(() => {
+                const dashToUse = period === 'wtd_mtd' ? dashboard?.wtd : 
+                                  period === 'qtd_ytd' ? dashboard?.qtd : 
+                                  dashboard?.ytd;
+                return (
+                  <>
+                    <SummaryPanel
+                      title="Sales Performance"
+                      accent="blue"
+                      metricKey="sales"
+                      dashboard={dashToUse}
+                    />
+                    <SummaryPanel
+                      title="Gross Profit Performance"
+                      accent="orange"
+                      metricKey="grossProfit"
+                      dashboard={dashToUse}
+                    />
+                  </>
+                );
+              })()}
+            </div>
+          )}
 
           {/* Salesmen Chart */}
-          <section className="min-h-0 flex flex-1 flex-col rounded-xl border border-slate-700 bg-slate-800 p-3 shadow-[0_14px_40px_rgba(0,0,0,0.3)] sm:p-4 lg:p-5">
-            <div>
-              <h2 className="text-lg font-extrabold tracking-tight text-blue-400 sm:text-xl md:text-2xl xl:text-3xl">
-                {currentPeriodLabel} Sales by Salesman{' '}
-                <span className="text-sm font-semibold text-slate-400 sm:text-base md:text-lg xl:text-xl">
-                  (vs Last {currentPeriodLabel})
-                </span>
-              </h2>
-              {period !== 'wtd' && (
-                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-slate-300 sm:text-sm md:text-base">
-                  <LegendDot color={colors.current} label={`${currentPeriodLabel} Sales (Current)`} solid />
-                  <LegendDot color={colors.previous} label={`${currentPeriodLabel} Sales (Previous)`} solid />
+          <section className="flex flex-col rounded-xl border border-slate-700 bg-slate-800 p-3 shadow-[0_14px_40px_rgba(0,0,0,0.3)] sm:p-4 lg:p-5">
+            {period === 'wtd_mtd' ? (
+              <>
+                {/* WTD / MTD Dual Display */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <h2 className="text-lg font-extrabold tracking-tight text-blue-400 sm:text-xl md:text-2xl">
+                      WTD Sales by Salesman
+                    </h2>
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-extrabold tracking-tight text-blue-400 sm:text-xl md:text-2xl">
+                      MTD Sales by Salesman
+                    </h2>
+                  </div>
                 </div>
-              )}
-            </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* WTD Column */}
+                  <div className="flex flex-col gap-0.5">
+                    {chartRows.left
+                      .filter((row) => row.salesmanName && row.salesmanName !== 'None' && row.salesmanName !== 'N/A' && row.salesmanName.trim() !== '')
+                      .sort((a, b) => (b.currentSales ?? 0) - (a.currentSales ?? 0))
+                      .map((row) => {
+                        const current = row.currentSales ?? 0;
+                        const maxValue = Math.max(...chartRows.left.map(r => r.currentSales ?? 0));
+                        const currentPct = maxValue > 0 ? (current / maxValue) * 100 : 0;
+                        const nameSize = isLargeScreen ? 'text-lg' : 'text-sm';
+                        const valueSize = isLargeScreen ? 'text-lg' : 'text-sm';
+                        const barHeight = isLargeScreen ? 'h-7' : 'h-5';
+                        const rowPadding = isLargeScreen ? 'py-1.5' : 'py-1';
 
-            <div className="mt-3 min-h-0 flex-1 rounded-lg bg-slate-900 p-1 overflow-hidden">
-              <div className="flex flex-col gap-0.5 h-full overflow-hidden">
-                {chartRows
-                  .filter((row) => row.salesmanName && row.salesmanName !== 'None' && row.salesmanName !== 'N/A' && row.salesmanName.trim() !== '')
-                  .map((row) => {
-                  const current = row.currentSales ?? 0;
-                  const previous = row.previousSales ?? 0;
-                  const maxValue = Math.max(...chartRows.map(r => r.currentSales ?? 0));
-                  const currentPct = maxValue > 0 ? (current / maxValue) * 100 : 0;
-                  const diff = current - previous;
-                  const pctChange = previous !== 0 ? ((diff / previous) * 100) : 0;
-                  const isPositive = pctChange >= 0;
-                  const nameSize = isLargeScreen ? 'text-lg' : 'text-sm';
-                  const valueSize = isLargeScreen ? 'text-lg' : 'text-sm';
-                  const barHeight = isLargeScreen ? 'h-7' : 'h-5';
-                  const rowPadding = isLargeScreen ? 'py-1.5' : 'py-1';
+                        return (
+                          <div key={`wtd-${row.salesmanId}`} className={cn('flex items-center gap-1.5 px-1.5 rounded-sm bg-slate-800 hover:bg-slate-750 transition-colors border border-slate-700', rowPadding)}>
+                            <div className={cn('font-bold text-slate-100 truncate', nameSize, isLargeScreen ? 'w-32' : 'w-24')}>
+                              {row.salesmanName}
+                            </div>
+                            <div className={cn('flex-1 bg-slate-700 rounded-sm overflow-hidden border border-slate-600 relative', barHeight)}>
+                              <div
+                                className="h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all"
+                                style={{ width: `${currentPct}%` }}
+                              />
+                            </div>
+                            <div className={cn('flex-shrink-0 text-right font-bold text-blue-400', valueSize, isLargeScreen ? 'w-20' : 'w-16')}>
+                              {formatNumber(current)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
 
-                  return (
-                    <div key={row.salesmanId} className={cn('flex items-center gap-1.5 px-1.5 rounded-sm bg-slate-800 hover:bg-slate-750 transition-colors border border-slate-700', rowPadding)}>
-                      {/* Name - Fixed Max Width */}
-                      <div className={cn('font-bold text-slate-100 truncate', nameSize, isLargeScreen ? 'w-48' : 'w-32')}>
-                        {row.salesmanName}
-                      </div>
+                  {/* MTD Column */}
+                  <div className="flex flex-col gap-0.5">
+                    {chartRows.right
+                      .filter((row) => row.salesmanName && row.salesmanName !== 'None' && row.salesmanName !== 'N/A' && row.salesmanName.trim() !== '')
+                      .sort((a, b) => (b.currentSales ?? 0) - (a.currentSales ?? 0))
+                      .map((row) => {
+                        const current = row.currentSales ?? 0;
+                        const previous = row.previousSales ?? 0;
+                        const maxValue = Math.max(...chartRows.right.map(r => r.currentSales ?? 0));
+                        const currentPct = maxValue > 0 ? (current / maxValue) * 100 : 0;
+                        const diff = current - previous;
+                        const pctChange = previous !== 0 ? ((diff / previous) * 100) : 0;
+                        const isPositive = pctChange >= 0;
+                        const nameSize = isLargeScreen ? 'text-lg' : 'text-sm';
+                        const valueSize = isLargeScreen ? 'text-lg' : 'text-sm';
+                        const barHeight = isLargeScreen ? 'h-7' : 'h-5';
+                        const rowPadding = isLargeScreen ? 'py-1.5' : 'py-1';
 
-                      {/* Bar */}
-                      <div className={cn('flex-1 bg-slate-700 rounded-sm overflow-hidden border border-slate-600 relative', barHeight)}>
-                        <div
-                          className="h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all"
-                          style={{ width: `${currentPct}%` }}
-                        />
-                      </div>
+                        return (
+                          <div key={`mtd-${row.salesmanId}`} className={cn('flex items-center gap-1.5 px-1.5 rounded-sm bg-slate-800 hover:bg-slate-750 transition-colors border border-slate-700', rowPadding)}>
+                            <div className={cn('font-bold text-slate-100 truncate', nameSize, isLargeScreen ? 'w-32' : 'w-24')}>
+                              {row.salesmanName}
+                            </div>
+                            <div className={cn('flex-1 bg-slate-700 rounded-sm overflow-hidden border border-slate-600 relative', barHeight)}>
+                              <div
+                                className="h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all"
+                                style={{ width: `${currentPct}%` }}
+                              />
+                            </div>
+                            <div className={cn('flex-shrink-0 text-right font-bold text-blue-400', valueSize, isLargeScreen ? 'w-20' : 'w-16')}>
+                              {formatNumber(current)}
+                            </div>
+                            <div className={cn('flex-shrink-0 text-right text-slate-400', valueSize, isLargeScreen ? 'w-20' : 'w-16')}>
+                              ({formatNumber(previous)})
+                            </div>
+                            <div className={cn('flex-shrink-0 font-bold text-center rounded px-1.5', valueSize, isPositive ? 'text-emerald-400' : 'text-red-400', isLargeScreen ? 'w-14' : 'w-12')}>
+                              {isPositive ? '↑' : '↓'} {Math.abs(pctChange).toFixed(0)}%
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              </>
+            ) : period === 'qtd' ? (
+              <>
+                {/* QTD Single Display */}
+                <div>
+                  <h2 className="text-lg font-extrabold tracking-tight text-blue-400 sm:text-xl md:text-2xl">
+                    QTD Sales by Salesman
+                  </h2>
+                </div>
+                <div className="mt-4 flex flex-col gap-0.5">
+                  {chartRows.left
+                    .filter((row) => row.salesmanName && row.salesmanName !== 'None' && row.salesmanName !== 'N/A' && row.salesmanName.trim() !== '')
+                    .sort((a, b) => (b.currentSales ?? 0) - (a.currentSales ?? 0))
+                    .map((row) => {
+                      const current = row.currentSales ?? 0;
+                      const previous = row.previousSales ?? 0;
+                      const maxValue = Math.max(...chartRows.left.map(r => r.currentSales ?? 0));
+                      const currentPct = maxValue > 0 ? (current / maxValue) * 100 : 0;
+                      const diff = current - previous;
+                      const pctChange = previous !== 0 ? ((diff / previous) * 100) : 0;
+                      const isPositive = pctChange >= 0;
+                      const nameSize = isLargeScreen ? 'text-lg' : 'text-sm';
+                      const valueSize = isLargeScreen ? 'text-lg' : 'text-sm';
+                      const barHeight = isLargeScreen ? 'h-7' : 'h-5';
+                      const rowPadding = isLargeScreen ? 'py-1.5' : 'py-1';
 
-                      {/* Current Value */}
-                      <div className={cn('flex-shrink-0 text-right font-bold text-blue-400', valueSize, isLargeScreen ? 'w-20' : 'w-18')}>
-                        {formatNumber(current)}
-                      </div>
-
-                      {/* Previous Value - Only show for non-WTD periods */}
-                      {period !== 'wtd' && (
-                        <div className={cn('flex-shrink-0 text-right text-slate-400', valueSize, isLargeScreen ? 'w-20' : 'w-16')}>
-                          ({formatNumber(previous)})
+                      return (
+                        <div key={`qtd-${row.salesmanId}`} className={cn('flex items-center gap-1.5 px-1.5 rounded-sm bg-slate-800 hover:bg-slate-750 transition-colors border border-slate-700', rowPadding)}>
+                          <div className={cn('font-bold text-slate-100 truncate', nameSize, isLargeScreen ? 'w-48' : 'w-32')}>
+                            {row.salesmanName}
+                          </div>
+                          <div className={cn('flex-1 bg-slate-700 rounded-sm overflow-hidden border border-slate-600 relative', barHeight)}>
+                            <div
+                              className="h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all"
+                              style={{ width: `${currentPct}%` }}
+                            />
+                          </div>
+                          <div className={cn('flex-shrink-0 text-right font-bold text-blue-400', valueSize, isLargeScreen ? 'w-20' : 'w-18')}>
+                            {formatNumber(current)}
+                          </div>
+                          <div className={cn('flex-shrink-0 text-right text-slate-400', valueSize, isLargeScreen ? 'w-20' : 'w-16')}>
+                            ({formatNumber(previous)})
+                          </div>
+                          <div className={cn('flex-shrink-0 font-bold text-center rounded px-1.5', valueSize, isPositive ? 'text-emerald-400' : 'text-red-400', isLargeScreen ? 'w-14' : 'w-12')}>
+                            {isPositive ? '↑' : '↓'} {Math.abs(pctChange).toFixed(0)}%
+                          </div>
                         </div>
-                      )}
+                      );
+                    })}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* YTD Single Display */}
+                <div>
+                  <h2 className="text-lg font-extrabold tracking-tight text-blue-400 sm:text-xl md:text-2xl">
+                    YTD Sales by Salesman
+                  </h2>
+                </div>
+                <div className="mt-4 flex flex-col gap-0.5">
+                  {chartRows.left
+                    .filter((row) => row.salesmanName && row.salesmanName !== 'None' && row.salesmanName !== 'N/A' && row.salesmanName.trim() !== '')
+                    .sort((a, b) => (b.currentSales ?? 0) - (a.currentSales ?? 0))
+                    .map((row) => {
+                      const current = row.currentSales ?? 0;
+                      const previous = row.previousSales ?? 0;
+                      const maxValue = Math.max(...chartRows.left.map(r => r.currentSales ?? 0));
+                      const currentPct = maxValue > 0 ? (current / maxValue) * 100 : 0;
+                      const diff = current - previous;
+                      const pctChange = previous !== 0 ? ((diff / previous) * 100) : 0;
+                      const isPositive = pctChange >= 0;
+                      const nameSize = isLargeScreen ? 'text-lg' : 'text-sm';
+                      const valueSize = isLargeScreen ? 'text-lg' : 'text-sm';
+                      const barHeight = isLargeScreen ? 'h-7' : 'h-5';
+                      const rowPadding = isLargeScreen ? 'py-1.5' : 'py-1';
 
-                      {/* Trend - Only show for non-WTD periods */}
-                      {period !== 'wtd' && (
-                        <div className={cn('flex-shrink-0 font-bold text-center rounded px-1.5', valueSize, isPositive ? 'text-emerald-400' : 'text-red-400', isLargeScreen ? 'w-14' : 'w-12')}>
-                          {isPositive ? '↑' : '↓'} {Math.abs(pctChange).toFixed(0)}%
+                      return (
+                        <div key={`ytd-full-${row.salesmanId}`} className={cn('flex items-center gap-1.5 px-1.5 rounded-sm bg-slate-800 hover:bg-slate-750 transition-colors border border-slate-700', rowPadding)}>
+                          <div className={cn('font-bold text-slate-100 truncate', nameSize, isLargeScreen ? 'w-48' : 'w-32')}>
+                            {row.salesmanName}
+                          </div>
+                          <div className={cn('flex-1 bg-slate-700 rounded-sm overflow-hidden border border-slate-600 relative', barHeight)}>
+                            <div
+                              className="h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all"
+                              style={{ width: `${currentPct}%` }}
+                            />
+                          </div>
+                          <div className={cn('flex-shrink-0 text-right font-bold text-blue-400', valueSize, isLargeScreen ? 'w-20' : 'w-18')}>
+                            {formatNumber(current)}
+                          </div>
+                          <div className={cn('flex-shrink-0 text-right text-slate-400', valueSize, isLargeScreen ? 'w-20' : 'w-16')}>
+                            ({formatNumber(previous)})
+                          </div>
+                          <div className={cn('flex-shrink-0 font-bold text-center rounded px-1.5', valueSize, isPositive ? 'text-emerald-400' : 'text-red-400', isLargeScreen ? 'w-14' : 'w-12')}>
+                            {isPositive ? '↑' : '↓'} {Math.abs(pctChange).toFixed(0)}%
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+                      );
+                    })}
+                </div>
+              </>
+            )}
 
             {/* Period Carousel */}
-            <div className="mt-2 shrink-0 flex justify-center">
+            <div className="mt-4 shrink-0 flex justify-center">
               <div className="inline-flex rounded-full border border-slate-600 bg-slate-800 p-1 shadow-[0_8px_22px_rgba(0,0,0,0.3)]">
                 {periodCarousel.map((key) => (
                   <button
                     key={key}
                     disabled
                     className={cn(
-                      'min-w-32 rounded-full px-5 py-2.5 text-center text-sm font-bold transition cursor-default',
+                      'min-w-40 rounded-full px-5 py-2.5 text-center text-sm font-bold transition cursor-default',
                       period === key
                         ? 'bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,246,0.5)]'
                         : 'text-slate-400'

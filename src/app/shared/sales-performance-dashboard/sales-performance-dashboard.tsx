@@ -31,7 +31,7 @@ type ColorsType = {
 const colors: ColorsType = {
   sales: '#3b82f6',           // blue (current for other sites)
   salesPrev: '#94a3b8',       // slate-400 (previous for other sites)
-  profit: '#f97316',          // orange (current year profit %)
+  profit: '#22c55e',          // green (current year profit %)
   profitLight: '#fcd34d',     // light yellow (last year profit %)
   currentSite: '#ef4444',     // red (current for selected site)
   currentSitePrev: '#fbbf24', // amber (previous for selected site)
@@ -164,21 +164,7 @@ export default function SalesPerformanceDashboard() {
   }, [dashboard]);
 
   // Calculate dynamic profit domain based on max profit % with padding
-  const profitDomain = useMemo<[number, number]>(() => {
-    if (!dashboard || !dashboard.chartRows) return [0, 50];
-    
-    const allProfitValues: number[] = [];
-    dashboard.chartRows.forEach((row) => {
-      allProfitValues.push(row.profitPct ?? 0, row.lastYearProfitPct ?? 0);
-    });
-    
-    if (allProfitValues.length === 0) return [0, 50];
-    
-    const maxProfit = Math.max(...allProfitValues);
-    const domainMax = Math.ceil((maxProfit / 10) * 1.1) * 10; // Round up to nearest 10 with 10% padding
-    
-    return [0, Math.max(domainMax, 25)]; // Minimum 25 for better visibility
-  }, [dashboard]);
+  const profitDomain: [number, number] = [0, 25];
 
   const currentPeriodLabel = periodLabels[period];
   const xTickInterval = 0;
@@ -221,34 +207,35 @@ export default function SalesPerformanceDashboard() {
           </p>
         </header>
 
-        {error ? (
-          <div className="rounded-3xl border border-red-900 bg-red-950 p-6 text-sm text-red-200 shadow-[0_12px_35px_rgba(0,0,0,0.3)]">
-            {error}
+        <div className="min-h-0 flex-1 overflow-hidden flex flex-col gap-1.5">
+          {error ? (
+            <div className="rounded-3xl border border-red-900 bg-red-950 p-6 text-sm text-red-200 shadow-[0_12px_35px_rgba(0,0,0,0.3)] px-1.5 py-1.5">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="grid gap-2 xl:grid-cols-2 px-1.5">
+            <SummaryPanel
+              title="Sales Performance"
+              accent="blue"
+              metricKey="sales"
+              dashboard={dashboard}
+              siteId={siteId}
+              source={source}
+              period={period}
+            />
+            <SummaryPanel
+              title="Gross Profit Performance"
+              accent="orange"
+              metricKey="grossProfit"
+              dashboard={dashboard}
+              siteId={siteId}
+              source={source}
+              period={period}
+            />
           </div>
-        ) : null}
 
-        <div className="grid gap-2 xl:grid-cols-2">
-          <SummaryPanel
-            title="Sales Performance"
-            accent="blue"
-            metricKey="sales"
-            dashboard={dashboard}
-            siteId={siteId}
-            source={source}
-            period={period}
-          />
-          <SummaryPanel
-            title="Gross Profit Performance"
-            accent="orange"
-            metricKey="grossProfit"
-            dashboard={dashboard}
-            siteId={siteId}
-            source={source}
-            period={period}
-          />
-        </div>
-
-        <section className="min-h-0 flex flex-1 flex-col rounded-xl border border-slate-700 bg-slate-800 p-3 shadow-[0_14px_40px_rgba(0,0,0,0.3)] sm:p-4 lg:p-5">
+          <section className="min-h-0 flex-1 flex flex-col rounded-xl border border-slate-700 bg-slate-800 p-3 shadow-[0_14px_40px_rgba(0,0,0,0.3)] sm:p-4 lg:p-5 overflow-hidden mx-1.5">
           <div>
             <h2 className="text-lg font-extrabold tracking-tight text-blue-400 sm:text-xl md:text-2xl xl:text-3xl">
               {currentPeriodLabel} Sales by Site{' '}
@@ -258,7 +245,6 @@ export default function SalesPerformanceDashboard() {
               <LegendDot color={colors.sales} label={`${currentPeriodLabel} Sales (Current)`} solid />
               <LegendDot color={colors.salesPrev} label={`${currentPeriodLabel} Sales (Last Year)`} dashed />
               <LegendDot color={colors.profit} label={`${currentPeriodLabel} Profit % (Current)`} solid />
-              <LegendDot color={colors.profitLight} label={`${currentPeriodLabel} Profit % (Last Year)`} dashed />
             </div>
           </div>
 
@@ -325,7 +311,7 @@ export default function SalesPerformanceDashboard() {
                     width={52}
                     domain={profitDomain}
                     allowDataOverflow
-                    ticks={[0, 10, 20, 30, 40, 50]}
+                    ticks={[0, 5, 10, 15, 20, 25]}
                     tickFormatter={(value) => `${value}%`}
                   />
                   <Bar yAxisId="left" dataKey="salesAmt" name={`${currentPeriodLabel} Sales (Current)`} fill="url(#salesFill)" barSize={barSize} radius={[8, 8, 0, 0]}>
@@ -343,14 +329,6 @@ export default function SalesPerformanceDashboard() {
                       dataKey="profitPct"
                       content={(props) => (
                         <LineValueLabel {...props} mode="current" chartRows={chartRows} selectedSiteId={siteId} />
-                      )}
-                    />
-                  </Line>
-                  <Line yAxisId="right" dataKey="lastYearProfitPct" name={`${currentPeriodLabel} Profit % (Last Year)`} stroke={colors.profitLight} strokeWidth={3} strokeDasharray="8 4" dot={false} isAnimationActive={false}>
-                    <LabelList
-                      dataKey="lastYearProfitPct"
-                      content={(props) => (
-                        <LineValueLabel {...props} mode="lastYear" chartRows={chartRows} selectedSiteId={siteId} />
                       )}
                     />
                   </Line>
@@ -379,6 +357,7 @@ export default function SalesPerformanceDashboard() {
             </div>
           </div>
         </section>
+        </div>
       </div>
     </div>
   );
@@ -639,17 +618,15 @@ function LineValueLabel({
   const isCurrent = mode === 'current';
   const yShift = isCurrent ? -35 : -65;
 
-  // Use red/amber for selected site, orange/emerald for others
-  const fill = isSelectedSite 
-    ? (isCurrent ? '#ef4444' : '#fbbf24')  // red for current, amber for last year (selected site)
-    : (isCurrent ? '#f97316' : '#10b981'); // orange for current, emerald for last year (other sites)
+  // Use green for current profit, light yellow for last year
+  const fill = isSelectedSite ? '#ef4444' : '#22c55e'; // red for selected site, green for others
   const text = `${pvalue.toFixed(2)}%`;
-  const width = text.length * 8 + 16;
+  const width = text.length * 7 + 12;
 
   return (
     <g transform={`translate(${px - width / 2},${py + yShift})`}>
-      <rect width={width} height={24} rx={6} fill="#ffffff" fillOpacity={0.95} stroke="#f1f5ff" />
-      <text x={width / 2} y={16} textAnchor="middle" fontSize="16" fontWeight="900" fill={fill}>
+      <rect width={width} height={20} rx={5} fill="#ffffff" fillOpacity={0.95} stroke="#f1f5ff" />
+      <text x={width / 2} y={14} textAnchor="middle" fontSize="12" fontWeight="900" fill={fill}>
         {text}
       </text>
     </g>
