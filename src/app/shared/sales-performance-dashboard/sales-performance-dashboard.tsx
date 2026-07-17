@@ -70,7 +70,7 @@ function buildSalesDomain(values: number[]): [number, number] {
 }
 
 export default function SalesPerformanceDashboard() {
-  const [period, setPeriod] = useState<SalesPerformancePeriod>('mtd');
+  const [period, setPeriod] = useState<SalesPerformancePeriod>('wtd');
   const [siteId, setSiteId] = useState<string | null>(null);
   const [source, setSource] = useState<SalesPerformanceDashboardType['source'] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +99,11 @@ export default function SalesPerformanceDashboard() {
 
   useEffect(() => {
     let mounted = true;
+
+    if (!siteId) {
+      console.log('⏳ Waiting for site_id...');
+      return;
+    }
 
     fetchSalesPerformance(siteId)
       .then((response) => {
@@ -647,8 +652,8 @@ function CustomXAxisTick({
   const prevColor = isSelected ? '#fbbf24' : '#94a3b8'; // amber for selected, slate for others
   const siteIdColor = isSelected ? '#ef4444' : '#94a3b8'; // red for selected, slate for others
 
-  const currentSalesAmount = rowData ? formatNumber(rowData.salesAmt) : '-';
-  const prevSalesAmount = rowData ? formatNumber(rowData.lastYearSalesAmt) : '-';
+  const currentSalesAmount = rowData && rowData.salesAmt !== undefined ? formatNumber(rowData.salesAmt) : '-';
+  const prevSalesAmount = rowData && rowData.lastYearSalesAmt !== undefined ? formatNumber(rowData.lastYearSalesAmt) : '-';
 
   const boxWidth = 100;
   const boxHeight = 48;

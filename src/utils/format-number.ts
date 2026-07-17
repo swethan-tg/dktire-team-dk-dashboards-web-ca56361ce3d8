@@ -3,7 +3,12 @@
  * @param {number} value - The number to be formatted.
  * @returns {string} - The formatted string.
  */
-export function formatNumber(value: number): string {
+export function formatNumber(value: number | undefined | null): string {
+  // Handle undefined/null values
+  if (value === undefined || value === null) {
+    return '--';
+  }
+  
   // Check if the value is less than 0
   if (value < 0) {
     // Handle negative values separately and format the absolute value
