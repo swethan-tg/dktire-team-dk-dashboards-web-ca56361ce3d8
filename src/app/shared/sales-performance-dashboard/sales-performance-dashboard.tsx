@@ -100,10 +100,7 @@ export default function SalesPerformanceDashboard() {
   useEffect(() => {
     let mounted = true;
 
-    if (!siteId) {
-      console.log('⏳ Waiting for site_id...');
-      return;
-    }
+    setError(null);
 
     fetchSalesPerformance(siteId)
       .then((response) => {
@@ -342,8 +339,10 @@ export default function SalesPerformanceDashboard() {
           <div className="mt-2 shrink-0 flex justify-center">
             <div className="inline-flex rounded-full border border-slate-600 bg-slate-800 p-1 shadow-[0_8px_22px_rgba(0,0,0,0.3)]">
               {periodCarousel.map((key) => (
-                <span
+                <button
                   key={key}
+                  type="button"
+                  onClick={() => setPeriod(key)}
                   className={cn(
                     'min-w-32 rounded-full px-5 py-2.5 text-center text-sm font-bold transition',
                     period === key
@@ -352,7 +351,7 @@ export default function SalesPerformanceDashboard() {
                   )}
                 >
                   {periodLabels[key]}
-                </span>
+                </button>
               ))}
             </div>
           </div>

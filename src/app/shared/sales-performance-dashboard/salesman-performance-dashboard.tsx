@@ -104,9 +104,11 @@ export default function SalesmanPerformanceDashboard() {
       }
     }
 
-    if (siteId) {
-      loadData();
-    }
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [siteId]);
 
   const dashboard = useMemo(() => {
@@ -145,10 +147,8 @@ export default function SalesmanPerformanceDashboard() {
     return Math.ceil(Math.max(...vals, 1) * 1.18);
   }, [rightRows]);
 
-  const calcYMax = (_rows: SalesmanDashboard['chartRows']) => sharedYMax;
-
   const fs = isLargeScreen ? 13 : 10;
-  const barSize = isLargeScreen ? 24 : 16;
+  const barSize = isLargeScreen ? 22 : 14;
   const barGap = 3;
 
   function ValueBox(props: {
@@ -203,8 +203,8 @@ export default function SalesmanPerformanceDashboard() {
 
   function SalesmanChart({ rows, title, isWtd, yMax }: { rows: SalesmanDashboard['chartRows']; title: string; isWtd: boolean; yMax: number }) {
     const data = rows.map(r => ({ name: r.salesmanName ?? '', current: r.currentSales ?? 0, previous: r.previousSales ?? 0 }));
-    const xH = isWtd ? (isLargeScreen ? 70 : 55) : (isLargeScreen ? 110 : 85);
-    const topM = isWtd ? 28 : 42;
+    const xH = isLargeScreen ? 100 : 78;
+    const topM = 36;
     return (
       <div className="flex flex-col min-h-0 flex-1">
         <h2 className="text-sm font-extrabold tracking-tight text-blue-400 sm:text-base md:text-lg xl:text-xl mb-1">{title}</h2>
@@ -285,9 +285,10 @@ export default function SalesmanPerformanceDashboard() {
                 {periodCarousel.map((key) => (
                   <button
                     key={key}
-                    disabled
+                    type="button"
+                    onClick={() => setPeriod(key)}
                     className={cn(
-                      'min-w-40 rounded-full px-5 py-2.5 text-center text-sm font-bold transition cursor-default',
+                      'min-w-40 rounded-full px-5 py-2.5 text-center text-sm font-bold transition',
                       period === key
                         ? 'bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,246,0.5)]'
                         : 'text-slate-400'
