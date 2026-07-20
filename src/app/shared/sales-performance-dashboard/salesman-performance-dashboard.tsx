@@ -10,14 +10,16 @@ import { buildSalesmanDashboard } from '@/services/salesman-performance/salesman
 import type { SalesmanDashboard } from '@/services/salesman-performance/salesman-performance.model';
 import type { SalesmanPeriod } from '@/services/salesman-performance/salesman-performance.model';
 
-type PeriodMode = 'wtd_mtd' | 'qtd_ytd';
+type PeriodMode = 'wtd' | 'mtd' | 'qtd' | 'ytd';
 
 const periodLabels: Record<PeriodMode, string> = {
-  wtd_mtd: 'WTD / MTD',
-  qtd_ytd: 'QTD / YTD',
+  wtd: 'WTD',
+  mtd: 'MTD',
+  qtd: 'QTD',
+  ytd: 'YTD',
 };
 
-const periodCarousel: PeriodMode[] = ['wtd_mtd', 'qtd_ytd'];
+const periodCarousel: PeriodMode[] = ['wtd', 'mtd', 'qtd', 'ytd'];
 
 type ColorsType = {
   current: string;
@@ -45,7 +47,7 @@ function LegendDot({ color, label, solid = true }: { color: string; label: strin
 }
 
 export default function SalesmanPerformanceDashboard() {
-  const [period, setPeriod] = useState<PeriodMode>('wtd_mtd');
+  const [period, setPeriod] = useState<PeriodMode>('wtd');
   const [siteId, setSiteId] = useState<string | null>(null);
   const [source, setSource] = useState<SalesmanDashboard['source'] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +78,7 @@ export default function SalesmanPerformanceDashboard() {
   useEffect(() => {
     const interval = setInterval(() => {
       setPeriod((prev) => {
-        const modes: PeriodMode[] = ['wtd_mtd', 'qtd_ytd'];
+        const modes: PeriodMode[] = ['wtd', 'mtd', 'qtd', 'ytd'];
         const currentIndex = modes.indexOf(prev);
         const nextIndex = (currentIndex + 1) % modes.length;
         return modes[nextIndex];
@@ -113,7 +115,7 @@ export default function SalesmanPerformanceDashboard() {
 
   const dashboard = useMemo(() => {
     if (!source) return null;
-    if (period === 'wtd_mtd') {
+    if (period === 'wtd') {
       return {
         left: buildSalesmanDashboard(source, 'wtd'),
         right: buildSalesmanDashboard(source, 'mtd'),
@@ -274,9 +276,8 @@ export default function SalesmanPerformanceDashboard() {
 
           {/* Dual Charts */}
           <section className="min-h-0 flex-1 flex flex-col rounded-xl border border-slate-700 bg-slate-800 p-3 shadow-[0_14px_40px_rgba(0,0,0,0.3)] overflow-hidden">
-            <div className="grid grid-cols-2 gap-4 min-h-0 flex-1">
-              <SalesmanChart rows={leftRows} title={`${dashboard?.leftLabel ?? ''} Sales by Salesman`} isWtd={period === 'wtd_mtd'} yMax={leftYMax} />
-              <SalesmanChart rows={rightRows} title={`${dashboard?.rightLabel ?? ''} Sales by Salesman`} isWtd={false} yMax={rightYMax} />
+            <div className="grid grid-cols-1 gap-4 min-h-0 flex-1">
+              <SalesmanChart rows={leftRows} title={`${dashboard?.leftLabel ?? ''} Sales by Salesman`} isWtd={period === 'wtd'} yMax={leftYMax} />
             </div>
 
             {/* Period Carousel */}
