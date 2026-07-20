@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { BarChart, Bar, Cell, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Legend, Tooltip, LabelList } from 'recharts';
+import { Bar, CartesianGrid, Cell, ComposedChart, LabelList, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { PiInfo } from 'react-icons/pi';
 import cn from '@core/utils/class-names';
 import { formatNumber } from '@/utils/format-number';
@@ -10,15 +10,14 @@ import { buildSalesmanDashboard } from '@/services/salesman-performance/salesman
 import type { SalesmanDashboard } from '@/services/salesman-performance/salesman-performance.model';
 import type { SalesmanPeriod } from '@/services/salesman-performance/salesman-performance.model';
 
-type PeriodMode = 'wtd_mtd' | 'qtd' | 'ytd';
+type PeriodMode = 'wtd_mtd' | 'qtd_ytd';
 
 const periodLabels: Record<PeriodMode, string> = {
   wtd_mtd: 'WTD / MTD',
-  qtd: 'QTD',
-  ytd: 'YTD',
+  qtd_ytd: 'QTD / YTD',
 };
 
-const periodCarousel: PeriodMode[] = ['wtd_mtd', 'qtd', 'ytd'];
+const periodCarousel: PeriodMode[] = ['wtd_mtd', 'qtd_ytd'];
 
 type ColorsType = {
   current: string;
@@ -77,12 +76,12 @@ export default function SalesmanPerformanceDashboard() {
   useEffect(() => {
     const interval = setInterval(() => {
       setPeriod((prev) => {
-        const modes: PeriodMode[] = ['wtd_mtd', 'qtd', 'ytd'];
+        const modes: PeriodMode[] = ['wtd_mtd', 'qtd_ytd'];
         const currentIndex = modes.indexOf(prev);
         const nextIndex = (currentIndex + 1) % modes.length;
         return modes[nextIndex];
       });
-    }, 60000); // 60 seconds = 1 minute
+    }, 60000);
 
     return () => clearInterval(interval);
   }, []);
@@ -112,49 +111,132 @@ export default function SalesmanPerformanceDashboard() {
 
   const dashboard = useMemo(() => {
     if (!source) return null;
-    
-    // Map PeriodMode to actual periods to fetch
     if (period === 'wtd_mtd') {
-      const wtdDash = buildSalesmanDashboard(source, 'wtd');
-      const mtdDash = buildSalesmanDashboard(source, 'mtd');
-      return { wtd: wtdDash, mtd: mtdDash };
-    } else if (period === 'qtd') {
-      return { qtd: buildSalesmanDashboard(source, 'qtd') };
+      return {
+        left: buildSalesmanDashboard(source, 'wtd'),
+        right: buildSalesmanDashboard(source, 'mtd'),
+        leftLabel: 'WTD',
+        rightLabel: 'MTD',
+      };
     } else {
-      // period === 'ytd'
-      return { ytd: buildSalesmanDashboard(source, 'ytd') };
+      return {
+        left: buildSalesmanDashboard(source, 'qtd'),
+        right: buildSalesmanDashboard(source, 'ytd'),
+        leftLabel: 'QTD',
+        rightLabel: 'YTD',
+      };
     }
   }, [source, period]);
 
-  const chartRows = useMemo(() => {
-    if (!dashboard) return { left: [], right: [] };
-    
-    if ('wtd' in dashboard) {
-      return {
-        left: dashboard.wtd?.chartRows ?? [],
-        right: dashboard.mtd?.chartRows ?? [],
-      };
-    } else if ('qtd' in dashboard) {
-      return {
-        left: dashboard.qtd?.chartRows ?? [],
-        right: [],
-      };
-    } else {
-      return {
-        left: dashboard.ytd?.chartRows ?? [],
-        right: [],
-      };
-    }
-  }, [dashboard]);
+  const filterRows = (rows: SalesmanDashboard['chartRows']) =>
+    rows.filter((r) => r.salesmanName && r.salesmanName !== 'None' && r.salesmanName !== 'N/A' && r.salesmanName.trim() !== '');
 
-  // Responsive sizing
-  const barSize = isLargeScreen ? 48 : 18;
-  const chartMargin = isLargeScreen ? 200 : 120;
+  const leftRows = useMemo(() => filterRows(dashboard?.left?.chartRows ?? []), [dashboard]);
+  const rightRows = useMemo(() => filterRows(dashboard?.right?.chartRows ?? []), [dashboard]);
+
+  // Each chart uses its own scale so WTD bars are not dwarfed by MTD/QTD/YTD values
+  const leftYMax = useMemo(() => {
+    const vals = leftRows.flatMap(r => [r.currentSales ?? 0, r.previousSales ?? 0]);
+    return Math.ceil(Math.max(...vals, 1) * 1.18);
+  }, [leftRows]);
+
+  const rightYMax = useMemo(() => {
+    const vals = rightRows.flatMap(r => [r.currentSales ?? 0, r.previousSales ?? 0]);
+    return Math.ceil(Math.max(...vals, 1) * 1.18);
+  }, [rightRows]);
+
+  const calcYMax = (_rows: SalesmanDashboard['chartRows']) => sharedYMax;
+
+  const fs = isLargeScreen ? 13 : 10;
+  const barSize = isLargeScreen ? 24 : 16;
+  const barGap = 3;
+
+  function ValueBox(props: {
+    x?: number; y?: number; width?: number; index?: number;
+    data: { name: string; current: number; previous: number }[];
+    isWtd: boolean;
+  }) {
+    const { x = 0, y = 0, width = 0, index = 0, data, isWtd } = props;
+    const row = data[index];
+    if (!row) return null;
+    const curText = formatNumber(row.current);
+    const prevText = formatNumber(row.previous);
+    // Min width based on text length so values always fit
+    const charW = fs * 0.65;
+    const textMinW = Math.max(curText.length, prevText.length) * charW + 12;
+    const groupW = isWtd ? width : width * 2 + barGap;
+    const rawBx = isWtd ? x : x - width / 2 - barGap / 2;
+    const boxW = Math.max(groupW, textMinW);
+    // Center box over group even if wider than group
+    const boxX = rawBx + groupW / 2 - boxW / 2;
+    const boxH = isWtd ? 18 : 32;
+    const boxY = y - boxH - 4;
+    const cx = boxX + boxW / 2;
+    return (
+      <g>
+        <rect x={boxX} y={boxY} width={boxW} height={boxH} rx={3} fill="#1e293b" stroke="#475569" strokeWidth={1} />
+        <text x={cx} y={boxY + 12} textAnchor="middle" fontSize={fs} fontWeight={800} fill="#60a5fa">{curText}</text>
+        {!isWtd && <>
+          <line x1={boxX+2} y1={boxY+16} x2={boxX+boxW-2} y2={boxY+16} stroke="#334155" strokeWidth={1}/>
+          <text x={cx} y={boxY + 28} textAnchor="middle" fontSize={fs} fontWeight={700} fill="#94a3b8">{prevText}</text>
+        </>}
+      </g>
+    );
+  }
+
+  function XTick({ x, y, payload, data, isWtd }: {
+    x?: number; y?: number; payload?: { value: string };
+    data: { name: string; current: number; previous: number }[];
+    isWtd: boolean;
+  }) {
+    if (!x || !y || !payload) return null;
+    const row = data.find(d => d.name === payload.value);
+    const pct = !isWtd && row && row.previous !== 0 ? ((row.current - row.previous) / row.previous) * 100 : null;
+    const isPos = pct !== null && pct >= 0;
+    return (
+      <g transform={`translate(${x},${y+4})`}>
+        <text transform="rotate(-40)" textAnchor="end" fontSize={fs} fontWeight={800} fill="#e2e8f0" dy={0}>{payload.value}</text>
+        {pct !== null && <text transform="rotate(-40)" textAnchor="end" fontSize={fs + 1} fontWeight={900} fill={isPos ? '#22c55e' : '#ef4444'} dy={fs + 5}>{isPos ? '↑' : '↓'} {Math.abs(pct).toFixed(0)}%</text>}
+      </g>
+    );
+  }
+
+  function SalesmanChart({ rows, title, isWtd, yMax }: { rows: SalesmanDashboard['chartRows']; title: string; isWtd: boolean; yMax: number }) {
+    const data = rows.map(r => ({ name: r.salesmanName ?? '', current: r.currentSales ?? 0, previous: r.previousSales ?? 0 }));
+    const xH = isWtd ? (isLargeScreen ? 70 : 55) : (isLargeScreen ? 110 : 85);
+    const topM = isWtd ? 28 : 42;
+    return (
+      <div className="flex flex-col min-h-0 flex-1">
+        <h2 className="text-sm font-extrabold tracking-tight text-blue-400 sm:text-base md:text-lg xl:text-xl mb-1">{title}</h2>
+        <div className="flex gap-3 mb-1 text-xs font-medium text-slate-300">
+          <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm bg-blue-500"></span>Current</span>
+          {!isWtd && <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm bg-slate-500"></span>Previous</span>}
+        </div>
+        <div className="flex-1 min-h-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={data} margin={{ top: topM, right: 8, bottom: 4, left: 4 }} barCategoryGap="38%" barGap={barGap}
+              className="[&_.recharts-cartesian-axis-tick-value]:fill-slate-400 [&_.recharts-surface]:overflow-visible">
+              <CartesianGrid stroke="#334155" strokeDasharray="4 8" vertical={false} />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} height={xH}
+                tick={(props) => <XTick {...props} data={data} isWtd={isWtd} />} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: fs, fill: '#94a3b8' }}
+                tickFormatter={(v) => formatNumber(v)} width={50}
+                domain={[0, yMax]} />
+              <Bar dataKey="current" fill="#3b82f6" barSize={barSize} radius={[4,4,0,0]}>
+                <LabelList dataKey="current" content={(p: any) => <ValueBox {...p} data={data} isWtd={isWtd} />} />
+              </Bar>
+              {!isWtd && <Bar dataKey="previous" fill="#475569" barSize={barSize} radius={[4,4,0,0]} />}
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen overflow-hidden bg-slate-900 text-slate-100">
-      <div className="flex h-full w-full flex-col gap-1.5">
-        <header className="grid grid-cols-[1fr_auto_1fr] items-center px-0 py-1 bg-slate-800 border-b border-slate-700">
+      <div className="flex h-full w-full flex-col">
+        <header className="grid grid-cols-[1fr_auto_1fr] items-center px-0 py-1 bg-slate-800 border-b border-slate-700 shrink-0">
           <div className="px-4 py-2 text-sm font-extrabold uppercase tracking-[0.05em] text-blue-400 sm:text-base md:text-lg xl:text-xl 2xl:text-2xl">
             DK Tire {siteId && `- ${siteId}`}
           </div>
@@ -168,238 +250,37 @@ export default function SalesmanPerformanceDashboard() {
         </header>
 
         {error ? (
-          <div className="rounded-3xl border border-red-900 bg-red-950 p-6 text-sm text-red-200 shadow-[0_12px_35px_rgba(0,0,0,0.3)]">
+          <div className="m-1.5 rounded-xl border border-red-900 bg-red-950 p-4 text-sm text-red-200">
             {error}
           </div>
         ) : null}
 
-        <div className="flex h-full w-full flex-col gap-1.5 p-1.5 overflow-auto">
-          {/* KPI Cards - Only show for first period in dual mode */}
-          {(period !== 'qtd' && period !== 'ytd') && (
-            <div className="grid gap-2 xl:grid-cols-2 shrink-0">
-              {(() => {
-                const dashToUse = period === 'wtd_mtd' ? dashboard?.wtd : 
-                                  period === 'qtd' ? dashboard?.qtd : 
-                                  dashboard?.ytd ?? null;
-                return dashToUse ? (
-                  <>
-                    <SummaryPanel
-                      title="Sales Performance"
-                      accent="blue"
-                      metricKey="sales"
-                      dashboard={dashToUse}
-                    />
-                    <SummaryPanel
-                      title="Gross Profit Performance"
-                      accent="orange"
-                      metricKey="grossProfit"
-                      dashboard={dashToUse}
-                    />
-                  </>
-                ) : null;
-              })()}
+        <div className="min-h-0 flex-1 flex flex-col gap-1.5 p-1.5 overflow-hidden">
+          {/* KPI Cards */}
+          <div className="grid gap-2 xl:grid-cols-2 shrink-0">
+            <SummaryPanel
+              title="Sales Performance"
+              accent="blue"
+              metricKey="sales"
+              dashboard={dashboard?.left ?? null}
+            />
+            <SummaryPanel
+              title="Gross Profit Performance"
+              accent="orange"
+              metricKey="grossProfit"
+              dashboard={dashboard?.left ?? null}
+            />
+          </div>
+
+          {/* Dual Charts */}
+          <section className="min-h-0 flex-1 flex flex-col rounded-xl border border-slate-700 bg-slate-800 p-3 shadow-[0_14px_40px_rgba(0,0,0,0.3)] overflow-hidden">
+            <div className="grid grid-cols-2 gap-4 min-h-0 flex-1">
+              <SalesmanChart rows={leftRows} title={`${dashboard?.leftLabel ?? ''} Sales by Salesman`} isWtd={period === 'wtd_mtd'} yMax={leftYMax} />
+              <SalesmanChart rows={rightRows} title={`${dashboard?.rightLabel ?? ''} Sales by Salesman`} isWtd={false} yMax={rightYMax} />
             </div>
-          )}
-
-          {/* Salesmen Chart */}
-          <section className="flex flex-col rounded-xl border border-slate-700 bg-slate-800 p-3 shadow-[0_14px_40px_rgba(0,0,0,0.3)] sm:p-4 lg:p-5">
-            {period === 'wtd_mtd' ? (
-              <>
-                {/* WTD / MTD Dual Display */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <h2 className="text-lg font-extrabold tracking-tight text-blue-400 sm:text-xl md:text-2xl">
-                      WTD Sales by Salesman
-                    </h2>
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-extrabold tracking-tight text-blue-400 sm:text-xl md:text-2xl">
-                      MTD Sales by Salesman
-                    </h2>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  {/* WTD Column */}
-                  <div className="flex flex-col gap-0.5">
-                    {chartRows.left
-                      .filter((row) => row.salesmanName && row.salesmanName !== 'None' && row.salesmanName !== 'N/A' && row.salesmanName.trim() !== '')
-                      .sort((a, b) => (b.currentSales ?? 0) - (a.currentSales ?? 0))
-                      .map((row) => {
-                        const current = row.currentSales ?? 0;
-                        const maxValue = Math.max(...chartRows.left.map(r => r.currentSales ?? 0));
-                        const currentPct = maxValue > 0 ? (current / maxValue) * 100 : 0;
-                        const nameSize = isLargeScreen ? 'text-lg' : 'text-sm';
-                        const valueSize = isLargeScreen ? 'text-lg' : 'text-sm';
-                        const barHeight = isLargeScreen ? 'h-7' : 'h-5';
-                        const rowPadding = isLargeScreen ? 'py-1.5' : 'py-1';
-
-                        return (
-                          <div key={`wtd-${row.salesmanId}`} className={cn('flex items-center gap-1.5 px-1.5 rounded-sm bg-slate-800 hover:bg-slate-750 transition-colors border border-slate-700', rowPadding)}>
-                            <div className={cn('font-bold text-slate-100 truncate', nameSize, isLargeScreen ? 'w-32' : 'w-24')}>
-                              {row.salesmanName}
-                            </div>
-                            <div className={cn('flex-1 bg-slate-700 rounded-sm overflow-hidden border border-slate-600 relative', barHeight)}>
-                              <div
-                                className="h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all"
-                                style={{ width: `${currentPct}%` }}
-                              />
-                            </div>
-                            <div className={cn('flex-shrink-0 text-right font-bold text-blue-400', valueSize, isLargeScreen ? 'w-20' : 'w-16')}>
-                              {formatNumber(current)}
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-
-                  {/* MTD Column */}
-                  <div className="flex flex-col gap-0.5">
-                    {chartRows.right
-                      .filter((row) => row.salesmanName && row.salesmanName !== 'None' && row.salesmanName !== 'N/A' && row.salesmanName.trim() !== '')
-                      .sort((a, b) => (b.currentSales ?? 0) - (a.currentSales ?? 0))
-                      .map((row) => {
-                        const current = row.currentSales ?? 0;
-                        const previous = row.previousSales ?? 0;
-                        const maxValue = Math.max(...chartRows.right.map(r => r.currentSales ?? 0));
-                        const currentPct = maxValue > 0 ? (current / maxValue) * 100 : 0;
-                        const diff = current - previous;
-                        const pctChange = previous !== 0 ? ((diff / previous) * 100) : 0;
-                        const isPositive = pctChange >= 0;
-                        const nameSize = isLargeScreen ? 'text-lg' : 'text-sm';
-                        const valueSize = isLargeScreen ? 'text-lg' : 'text-sm';
-                        const barHeight = isLargeScreen ? 'h-7' : 'h-5';
-                        const rowPadding = isLargeScreen ? 'py-1.5' : 'py-1';
-
-                        return (
-                          <div key={`mtd-${row.salesmanId}`} className={cn('flex items-center gap-1.5 px-1.5 rounded-sm bg-slate-800 hover:bg-slate-750 transition-colors border border-slate-700', rowPadding)}>
-                            <div className={cn('font-bold text-slate-100 truncate', nameSize, isLargeScreen ? 'w-32' : 'w-24')}>
-                              {row.salesmanName}
-                            </div>
-                            <div className={cn('flex-1 bg-slate-700 rounded-sm overflow-hidden border border-slate-600 relative', barHeight)}>
-                              <div
-                                className="h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all"
-                                style={{ width: `${currentPct}%` }}
-                              />
-                            </div>
-                            <div className={cn('flex-shrink-0 text-right font-bold text-blue-400', valueSize, isLargeScreen ? 'w-20' : 'w-16')}>
-                              {formatNumber(current)}
-                            </div>
-                            <div className={cn('flex-shrink-0 text-right text-slate-400', valueSize, isLargeScreen ? 'w-20' : 'w-16')}>
-                              ({formatNumber(previous)})
-                            </div>
-                            <div className={cn('flex-shrink-0 font-bold text-center rounded px-1.5', valueSize, isPositive ? 'text-emerald-400' : 'text-red-400', isLargeScreen ? 'w-14' : 'w-12')}>
-                              {isPositive ? '↑' : '↓'} {Math.abs(pctChange).toFixed(0)}%
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              </>
-            ) : period === 'qtd' ? (
-              <>
-                {/* QTD Single Display */}
-                <div>
-                  <h2 className="text-lg font-extrabold tracking-tight text-blue-400 sm:text-xl md:text-2xl">
-                    QTD Sales by Salesman
-                  </h2>
-                </div>
-                <div className="mt-4 flex flex-col gap-0.5">
-                  {chartRows.left
-                    .filter((row) => row.salesmanName && row.salesmanName !== 'None' && row.salesmanName !== 'N/A' && row.salesmanName.trim() !== '')
-                    .sort((a, b) => (b.currentSales ?? 0) - (a.currentSales ?? 0))
-                    .map((row) => {
-                      const current = row.currentSales ?? 0;
-                      const previous = row.previousSales ?? 0;
-                      const maxValue = Math.max(...chartRows.left.map(r => r.currentSales ?? 0));
-                      const currentPct = maxValue > 0 ? (current / maxValue) * 100 : 0;
-                      const diff = current - previous;
-                      const pctChange = previous !== 0 ? ((diff / previous) * 100) : 0;
-                      const isPositive = pctChange >= 0;
-                      const nameSize = isLargeScreen ? 'text-lg' : 'text-sm';
-                      const valueSize = isLargeScreen ? 'text-lg' : 'text-sm';
-                      const barHeight = isLargeScreen ? 'h-7' : 'h-5';
-                      const rowPadding = isLargeScreen ? 'py-1.5' : 'py-1';
-
-                      return (
-                        <div key={`qtd-${row.salesmanId}`} className={cn('flex items-center gap-1.5 px-1.5 rounded-sm bg-slate-800 hover:bg-slate-750 transition-colors border border-slate-700', rowPadding)}>
-                          <div className={cn('font-bold text-slate-100 truncate', nameSize, isLargeScreen ? 'w-48' : 'w-32')}>
-                            {row.salesmanName}
-                          </div>
-                          <div className={cn('flex-1 bg-slate-700 rounded-sm overflow-hidden border border-slate-600 relative', barHeight)}>
-                            <div
-                              className="h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all"
-                              style={{ width: `${currentPct}%` }}
-                            />
-                          </div>
-                          <div className={cn('flex-shrink-0 text-right font-bold text-blue-400', valueSize, isLargeScreen ? 'w-20' : 'w-18')}>
-                            {formatNumber(current)}
-                          </div>
-                          <div className={cn('flex-shrink-0 text-right text-slate-400', valueSize, isLargeScreen ? 'w-20' : 'w-16')}>
-                            ({formatNumber(previous)})
-                          </div>
-                          <div className={cn('flex-shrink-0 font-bold text-center rounded px-1.5', valueSize, isPositive ? 'text-emerald-400' : 'text-red-400', isLargeScreen ? 'w-14' : 'w-12')}>
-                            {isPositive ? '↑' : '↓'} {Math.abs(pctChange).toFixed(0)}%
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </>
-            ) : (
-              <>
-                {/* YTD Single Display */}
-                <div>
-                  <h2 className="text-lg font-extrabold tracking-tight text-blue-400 sm:text-xl md:text-2xl">
-                    YTD Sales by Salesman
-                  </h2>
-                </div>
-                <div className="mt-4 flex flex-col gap-0.5">
-                  {chartRows.left
-                    .filter((row) => row.salesmanName && row.salesmanName !== 'None' && row.salesmanName !== 'N/A' && row.salesmanName.trim() !== '')
-                    .sort((a, b) => (b.currentSales ?? 0) - (a.currentSales ?? 0))
-                    .map((row) => {
-                      const current = row.currentSales ?? 0;
-                      const previous = row.previousSales ?? 0;
-                      const maxValue = Math.max(...chartRows.left.map(r => r.currentSales ?? 0));
-                      const currentPct = maxValue > 0 ? (current / maxValue) * 100 : 0;
-                      const diff = current - previous;
-                      const pctChange = previous !== 0 ? ((diff / previous) * 100) : 0;
-                      const isPositive = pctChange >= 0;
-                      const nameSize = isLargeScreen ? 'text-lg' : 'text-sm';
-                      const valueSize = isLargeScreen ? 'text-lg' : 'text-sm';
-                      const barHeight = isLargeScreen ? 'h-7' : 'h-5';
-                      const rowPadding = isLargeScreen ? 'py-1.5' : 'py-1';
-
-                      return (
-                        <div key={`ytd-full-${row.salesmanId}`} className={cn('flex items-center gap-1.5 px-1.5 rounded-sm bg-slate-800 hover:bg-slate-750 transition-colors border border-slate-700', rowPadding)}>
-                          <div className={cn('font-bold text-slate-100 truncate', nameSize, isLargeScreen ? 'w-48' : 'w-32')}>
-                            {row.salesmanName}
-                          </div>
-                          <div className={cn('flex-1 bg-slate-700 rounded-sm overflow-hidden border border-slate-600 relative', barHeight)}>
-                            <div
-                              className="h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all"
-                              style={{ width: `${currentPct}%` }}
-                            />
-                          </div>
-                          <div className={cn('flex-shrink-0 text-right font-bold text-blue-400', valueSize, isLargeScreen ? 'w-20' : 'w-18')}>
-                            {formatNumber(current)}
-                          </div>
-                          <div className={cn('flex-shrink-0 text-right text-slate-400', valueSize, isLargeScreen ? 'w-20' : 'w-16')}>
-                            ({formatNumber(previous)})
-                          </div>
-                          <div className={cn('flex-shrink-0 font-bold text-center rounded px-1.5', valueSize, isPositive ? 'text-emerald-400' : 'text-red-400', isLargeScreen ? 'w-14' : 'w-12')}>
-                            {isPositive ? '↑' : '↓'} {Math.abs(pctChange).toFixed(0)}%
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </>
-            )}
 
             {/* Period Carousel */}
-            <div className="mt-4 shrink-0 flex justify-center">
+            <div className="mt-3 shrink-0 flex justify-center">
               <div className="inline-flex rounded-full border border-slate-600 bg-slate-800 p-1 shadow-[0_8px_22px_rgba(0,0,0,0.3)]">
                 {periodCarousel.map((key) => (
                   <button
