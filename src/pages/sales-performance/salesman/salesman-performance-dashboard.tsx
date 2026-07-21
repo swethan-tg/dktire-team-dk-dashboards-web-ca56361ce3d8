@@ -157,10 +157,16 @@ export default function SalesmanPerformanceDashboard() {
     x?: number; y?: number; width?: number; index?: number;
     data: { name: string; current: number; previous: number }[];
     isWtd: boolean;
+    series: 'current' | 'previous';
   }) {
-    const { x = 0, y = 0, width = 0, index = 0, data, isWtd } = props;
+    const { x = 0, y = 0, width = 0, index = 0, data, isWtd, series } = props;
     const row = data[index];
     if (!row) return null;
+    if (!isWtd) {
+      const isCurrentHigherOrEqual = row.current >= row.previous;
+      const shouldRender = series === 'current' ? isCurrentHigherOrEqual : !isCurrentHigherOrEqual;
+      if (!shouldRender) return null;
+    }
     const curText = formatNumber(row.current);
     const prevText = formatNumber(row.previous);
     // Min width based on text length so values always fit
@@ -225,9 +231,19 @@ export default function SalesmanPerformanceDashboard() {
                 tickFormatter={(v) => formatNumber(v)} width={50}
                 domain={[0, yMax]} />
               <Bar dataKey="current" fill="#3b82f6" barSize={barSize} radius={[4,4,0,0]}>
-                <LabelList dataKey="current" content={(p: any) => <ValueBox {...p} data={data} isWtd={isWtd} />} />
+                <LabelList
+                  dataKey="current"
+                  content={(p: any) => <ValueBox {...p} data={data} isWtd={isWtd} series="current" />}
+                />
               </Bar>
-              {!isWtd && <Bar dataKey="previous" fill="#475569" barSize={barSize} radius={[4,4,0,0]} />}
+              {!isWtd && (
+                <Bar dataKey="previous" fill="#475569" barSize={barSize} radius={[4,4,0,0]}>
+                  <LabelList
+                    dataKey="previous"
+                    content={(p: any) => <ValueBox {...p} data={data} isWtd={isWtd} series="previous" />}
+                  />
+                </Bar>
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -287,9 +303,10 @@ export default function SalesmanPerformanceDashboard() {
                   <button
                     key={key}
                     type="button"
-                    onClick={() => setPeriod(key)}
+                    disabled
+                    aria-disabled="true"
                     className={cn(
-                      'min-w-40 rounded-full px-5 py-2.5 text-center text-sm font-bold transition',
+                      'min-w-40 cursor-default rounded-full px-5 py-2.5 text-center text-sm font-bold transition disabled:pointer-events-none',
                       period === key
                         ? 'bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,246,0.5)]'
                         : 'text-slate-400'
