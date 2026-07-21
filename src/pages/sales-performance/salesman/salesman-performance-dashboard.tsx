@@ -224,28 +224,10 @@ export default function SalesmanPerformanceDashboard() {
               <YAxis axisLine={false} tickLine={false} tick={{ fontSize: fs, fill: '#94a3b8' }}
                 tickFormatter={(v) => formatNumber(v)} width={50}
                 domain={[0, yMax]} />
-             {!isWtd && (
-  <Bar
-    dataKey="previous"
-    fill="#475569"
-    barSize={barSize}
-    radius={[4, 4, 0, 0]}
-  />
-)}
-
-<Bar
-  dataKey="current"
-  fill="#3b82f6"
-  barSize={barSize}
-  radius={[4, 4, 0, 0]}
->
-  <LabelList
-    dataKey="current"
-    content={(props: any) => (
-      <ValueBox {...props} data={data} isWtd={isWtd} />
-    )}
-  />
-</Bar>
+              <Bar dataKey="current" fill="#3b82f6" barSize={barSize} radius={[4,4,0,0]}>
+                <LabelList dataKey="current" content={(p: any) => <ValueBox {...p} data={data} isWtd={isWtd} />} />
+              </Bar>
+              {!isWtd && <Bar dataKey="previous" fill="#475569" barSize={barSize} radius={[4,4,0,0]} />}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -258,14 +240,14 @@ export default function SalesmanPerformanceDashboard() {
       <div className="flex h-full w-full flex-col">
         <header className="grid grid-cols-[1fr_auto_1fr] items-center px-0 py-1 bg-slate-800 border-b border-slate-700 shrink-0">
           <div className="px-4 py-2 text-sm font-extrabold uppercase tracking-[0.05em] text-blue-400 sm:text-base md:text-lg xl:text-xl 2xl:text-2xl">
-            DK Tire{siteId && `- ${siteId}`}
+            DK Tire {siteId && `- ${siteId}`}
           </div>
           <h1 className="text-center text-sm font-extrabold uppercase tracking-[0.05em] text-blue-400 sm:text-base md:text-lg xl:text-xl 2xl:text-2xl">
             Salesman Performance Dashboard
           </h1>
           <p className="justify-self-end inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 md:text-sm xl:text-base">
             <PiInfo className="size-4 text-blue-400" />
-            <span>The dashboard data is as of yesterday</span>
+            <span>The dashboard data is as of till yesterday</span>
           </p>
         </header>
 
